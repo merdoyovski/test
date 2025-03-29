@@ -1,12 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
 
-interface TransferNodeProps {
+interface MeteoraNodeProps {
   data: {
     label: string;
     args: {
-      address: string;
-      amount: string;
+      poolAddress: string;
+      totalRangeInterval: string;
+      strategyType: string; // "0" for Spot, "1" for Curve, "2" for Bid Ask
+      inputTokenAmount: string;
     };
     onRemove: () => void;
     isActive: boolean;
@@ -17,11 +19,13 @@ interface TransferNodeProps {
   };
 }
 
-export const TransferNode = ({ data }: TransferNodeProps) => {
+export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
   const { label, args, onRemove, isActive, setActive, groupId, orderId, updateLabel } = data;
 
-  const [address, setAddress] = useState(args.address || "");
-  const [amount, setAmount] = useState(args.amount || "");
+  const [poolAddress, setPoolAddress] = useState(args.poolAddress || "");
+  const [totalRangeInterval, setTotalRangeInterval] = useState(args.totalRangeInterval || "10");
+  const [strategyType, setStrategyType] = useState(args.strategyType || "0"); // Default to Spot
+  const [inputTokenAmount, setInputTokenAmount] = useState(args.inputTokenAmount || "");
   const [activeState, setActiveState] = useState(isActive);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(label);
@@ -33,28 +37,40 @@ export const TransferNode = ({ data }: TransferNodeProps) => {
   
   // Sync args with local state
   useEffect(() => {
-    args.address = address;
-    args.amount = amount;
-  }, [address, amount, args]);
+    args.poolAddress = poolAddress;
+    args.totalRangeInterval = totalRangeInterval;
+    args.strategyType = strategyType;
+    args.inputTokenAmount = inputTokenAmount;
+  }, [poolAddress, totalRangeInterval, strategyType, inputTokenAmount, args]);
 
   // Sync label state with props
   useEffect(() => {
     setLabelValue(label);
   }, [label]);
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAddress(e.target.value);
-    args["address"] = e.target.value;
+  const handlePoolAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPoolAddress(e.target.value);
+    args.poolAddress = e.target.value;
   };
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAmount(e.target.value);
-    args["amount"] = e.target.value;
+  const handleTotalRangeIntervalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTotalRangeInterval(e.target.value);
+    args.totalRangeInterval = e.target.value;
+  };
+
+  const handleStrategyTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStrategyType(e.target.value);
+    args.strategyType = e.target.value;
+  };
+
+  const handleInputTokenAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputTokenAmount(e.target.value);
+    args.inputTokenAmount = e.target.value;
   };
 
   const handleIsActiveChange = () => {
     // Log current states before update
-    console.log("TransferNode handleIsActiveChange:");
+    console.log("MeteoraNode handleIsActiveChange:");
     console.log("- Current local activeState:", activeState);
     console.log("- Current props isActive:", isActive);
     
@@ -157,30 +173,90 @@ export const TransferNode = ({ data }: TransferNodeProps) => {
       <div className="mt-4">
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Address to Send
+            Pool Address
           </label>
           <input
             type="text"
-            value={address}
-            onChange={handleAddressChange}
+            value={poolAddress}
+            onChange={handlePoolAddressChange}
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-            placeholder="Enter address"
+            placeholder="Enter pool address"
           />
         </div>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Amount
+            Total Range Interval
           </label>
           <input
-            type="number"
-            value={amount}
-            onChange={handleAmountChange}
+            type="text"
+            value={totalRangeInterval}
+            onChange={handleTotalRangeIntervalChange}
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-            placeholder="Enter amount"
+            placeholder="Enter total range interval"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Strategy Type
+          </label>
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <input
+                id="spot"
+                type="radio"
+                value="0"
+                checked={strategyType === "0"}
+                onChange={handleStrategyTypeChange}
+                className="mr-2"
+              />
+              <label htmlFor="spot" className="text-sm text-gray-700">
+                Spot
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                id="curve"
+                type="radio"
+                value="1"
+                checked={strategyType === "1"}
+                onChange={handleStrategyTypeChange}
+                className="mr-2"
+              />
+              <label htmlFor="curve" className="text-sm text-gray-700">
+                Curve
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                id="bidAsk"
+                type="radio"
+                value="2"
+                checked={strategyType === "2"}
+                onChange={handleStrategyTypeChange}
+                className="mr-2"
+              />
+              <label htmlFor="bidAsk" className="text-sm text-gray-700">
+                Bid Ask
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Input Token Amount
+          </label>
+          <input
+            type="text"
+            value={inputTokenAmount}
+            onChange={handleInputTokenAmountChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+            placeholder="Enter input token amount"
           />
         </div>
       </div>
     </div>
   );
-};
+}; 

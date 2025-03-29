@@ -1,12 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
+import { TOKENS } from "../../_constants/tokens";
 
-interface TransferNodeProps {
+interface JupiterNodeProps {
   data: {
     label: string;
     args: {
-      address: string;
-      amount: string;
+      sellingToken: string;
+      buyingToken: string;
+      swapAmount: string;
+      slippage: string;
     };
     onRemove: () => void;
     isActive: boolean;
@@ -17,11 +20,14 @@ interface TransferNodeProps {
   };
 }
 
-export const TransferNode = ({ data }: TransferNodeProps) => {
+export const JupiterNode = ({ data }: JupiterNodeProps) => {
   const { label, args, onRemove, isActive, setActive, groupId, orderId, updateLabel } = data;
 
-  const [address, setAddress] = useState(args.address || "");
-  const [amount, setAmount] = useState(args.amount || "");
+  // Use the first token's id as default if not provided
+  const [sellingToken, setSellingToken] = useState<string>(args.sellingToken || TOKENS[0]?.id || "SOL");
+  const [buyingToken, setBuyingToken] = useState<string>(args.buyingToken || TOKENS[0]?.id || "USDC");
+  const [swapAmount, setSwapAmount] = useState(args.swapAmount || "");
+  const [slippage, setSlippage] = useState(args.slippage || "");
   const [activeState, setActiveState] = useState(isActive);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(label);
@@ -33,28 +39,30 @@ export const TransferNode = ({ data }: TransferNodeProps) => {
   
   // Sync args with local state
   useEffect(() => {
-    args.address = address;
-    args.amount = amount;
-  }, [address, amount, args]);
+    args.sellingToken = sellingToken;
+    args.buyingToken = buyingToken;
+    args.swapAmount = swapAmount;
+    args.slippage = slippage;
+  }, [sellingToken, buyingToken, swapAmount, slippage, args]);
 
   // Sync label state with props
   useEffect(() => {
     setLabelValue(label);
   }, [label]);
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAddress(e.target.value);
-    args["address"] = e.target.value;
+  const handleSwapAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSwapAmount(e.target.value);
+    args.swapAmount = e.target.value;
   };
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAmount(e.target.value);
-    args["amount"] = e.target.value;
+  const handleSlippageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSlippage(e.target.value);
+    args.slippage = e.target.value;
   };
 
   const handleIsActiveChange = () => {
     // Log current states before update
-    console.log("TransferNode handleIsActiveChange:");
+    console.log("JupiterNode handleIsActiveChange:");
     console.log("- Current local activeState:", activeState);
     console.log("- Current props isActive:", isActive);
     
@@ -156,31 +164,71 @@ export const TransferNode = ({ data }: TransferNodeProps) => {
 
       <div className="mt-4">
         <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Selling Token
+          </label>
+          <select
+            value={sellingToken}
+            onChange={(e) => {
+              setSellingToken(e.target.value);
+              args.sellingToken = e.target.value;
+            }}
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          >
+            {TOKENS.map((token) => (
+              <option key={`sell-${token.id}`} value={token.id}>
+                {token.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Buying Token
+          </label>
+          <select
+            value={buyingToken}
+            onChange={(e) => {
+              setBuyingToken(e.target.value);
+              args.buyingToken = e.target.value;
+            }}
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          >
+            {TOKENS.map((token) => (
+              <option key={`buy-${token.id}`} value={token.id}>
+                {token.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Address to Send
+            Swap Amount
           </label>
           <input
             type="text"
-            value={address}
-            onChange={handleAddressChange}
+            value={swapAmount}
+            onChange={handleSwapAmountChange}
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-            placeholder="Enter address"
+            placeholder="Enter amount to swap"
           />
         </div>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Amount
+            Slippage (%)
           </label>
           <input
-            type="number"
-            value={amount}
-            onChange={handleAmountChange}
+            type="text"
+            value={slippage}
+            onChange={handleSlippageChange}
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-            placeholder="Enter amount"
+            placeholder="Enter slippage percentage"
           />
         </div>
       </div>
     </div>
   );
-};
+}; 

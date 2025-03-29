@@ -1,13 +1,19 @@
+"use client";
 import { useMemo } from "react";
 import ReactFlow, { Controls, Background, Connection } from "reactflow";
 
 import { TransferNode } from "./nodes/transfer.node";
 
 import "reactflow/dist/style.css";
+import { ActionNode } from "./nodes/action.node";
+import { JupiterNode } from "./nodes/jupiter.node";
+import { MeteoraNode } from "./nodes/meteora.node";
 
 const nodeTemplates = {
-  // actionNode: ActionNode,
+  actionNode: ActionNode,
   transferNode: TransferNode,
+  jupiterNode: JupiterNode,
+  meteoraNode: MeteoraNode,
 };
 
 export interface FlowAreaProps {
