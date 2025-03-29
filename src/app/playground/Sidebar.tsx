@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
 import type { Node } from "reactflow";
-import { fetchWorkflowData } from "../_services/workflow";
+
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
@@ -31,19 +31,6 @@ import {
   buildOptimalTransaction,
   mergeComputeBudget,
 } from "../_helpers/computeBudget";
-
-function decodeComputeUnitLimit(data: any[]) {
-  return data[1] + (data[2] << 8) + (data[3] << 16) + (data[4] << 24);
-}
-function encodeComputeUnitLimit(limit) {
-  return [
-    2, // Instruction index for setComputeUnitLimit
-    limit & 0xff,
-    (limit >> 8) & 0xff,
-    (limit >> 16) & 0xff,
-    (limit >> 24) & 0xff,
-  ];
-}
 
 // Define the localStorage key for saving workflow
 const WORKFLOW_STORAGE_KEY = "bflow-workflow-data";
@@ -870,6 +857,11 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   };
 
   const getMeteoraIxs = async (newBalancePosition: Keypair, range: number) => {
+    if (publicKey === null) {
+      console.log("No wallet connected");
+
+      return;
+    }
     const USDC_USDT_POOL = new PublicKey(
       "5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6",
     );
@@ -926,7 +918,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         extraSigners.push(newBalancePosition);
 
         const meteoraIx = await getMeteoraIxs(newBalancePosition, 5);
-        instructions.push(...meteoraIx.slice(1));
+        if (meteoraIx) instructions.push(...meteoraIx.slice(1));
       } else if (node.type === "transferNode") {
         const { address, amount } = node.data.args;
 
