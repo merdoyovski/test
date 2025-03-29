@@ -1,22 +1,15 @@
 // SideBar.tsx
 "use client";
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
 import type { Node } from "reactflow";
-
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
   AddressLookupTableAccount,
-  ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  sendAndConfirmRawTransaction,
-  Signer,
   SystemProgram,
-  Transaction,
-  TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -25,12 +18,6 @@ import { BuildSwapTransaction, GetQuote } from "../_services/jupiter";
 import { TOKENS } from "../_constants/tokens";
 import DLMM, { autoFillYByStrategy, StrategyType } from "@meteora-ag/dlmm";
 import { BN } from "@coral-xyz/anchor";
-import { simulateTransaction } from "@coral-xyz/anchor/dist/cjs/utils/rpc";
-import { after } from "node:test";
-import {
-  buildOptimalTransaction,
-  mergeComputeBudget,
-} from "../_helpers/computeBudget";
 
 // Define the localStorage key for saving workflow
 const WORKFLOW_STORAGE_KEY = "bflow-workflow-data";

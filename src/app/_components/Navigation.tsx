@@ -1,20 +1,16 @@
 "use client";
-
-import {
-  useWalletModal,
-} from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useEdges } from "reactflow";
-import "@/styles/wallet.css";
 import dynamic from "next/dynamic";
 
 const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then(
-    (mod) => mod.WalletMultiButton
-  ),
-  { ssr: false }
+  () =>
+    import("@solana/wallet-adapter-react-ui").then(
+      (mod) => mod.WalletMultiButton,
+    ),
+  { ssr: false },
 );
 
 export function Navigation() {
