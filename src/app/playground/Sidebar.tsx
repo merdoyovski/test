@@ -18,6 +18,10 @@ import { BuildSwapTransaction, GetQuote } from "../_services/jupiter";
 import { TOKENS } from "../_constants/tokens";
 import DLMM, { autoFillYByStrategy, StrategyType } from "@meteora-ag/dlmm";
 import { BN } from "@coral-xyz/anchor";
+import {
+  meteoraInitLiquidity,
+  meteoraRemoveLiquidity,
+} from "../_services/meteora";
 
 // Define the localStorage key for saving workflow
 const WORKFLOW_STORAGE_KEY = "bflow-workflow-data";
@@ -843,54 +847,9 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     }
   };
 
-  const getMeteoraIxs = async (newBalancePosition: Keypair, range: number) => {
-    if (publicKey === null) {
-      console.log("No wallet connected");
-
-      return;
-    }
-    const USDC_USDT_POOL = new PublicKey(
-      "5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6",
-    );
-    const dlmmPool = await DLMM.create(connection, USDC_USDT_POOL);
-    const activeBin = await dlmmPool.getActiveBin();
-    const TOTAL_RANGE_INTERVAL = range;
-    const minBinId = activeBin.binId - TOTAL_RANGE_INTERVAL;
-    const maxBinId = activeBin.binId + TOTAL_RANGE_INTERVAL;
-
-    const totalXAmount = new BN(100 * 10 ** 0);
-    const totalYAmount = autoFillYByStrategy(
-      activeBin.binId,
-      dlmmPool.lbPair.binStep,
-      totalXAmount,
-      activeBin.xAmount,
-      activeBin.yAmount,
-      minBinId,
-      maxBinId,
-      StrategyType.Spot,
-    );
-
-    // Create Position
-    const createPositionTx =
-      await dlmmPool.initializePositionAndAddLiquidityByStrategy({
-        positionPubKey: newBalancePosition.publicKey,
-        user: publicKey,
-        totalXAmount,
-        totalYAmount,
-        strategy: {
-          maxBinId,
-          minBinId,
-          strategyType: StrategyType.Spot,
-        },
-      });
-    console.log("createPositionTx", createPositionTx.instructions);
-    return createPositionTx.instructions;
-  };
-
   const handleExecuteWorkflow = async () => {
     if (publicKey === null) {
       console.log("No wallet connected");
-
       return;
     }
 
@@ -900,12 +859,47 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     let addressLookupTableAccounts;
 
     for (const node of nodes) {
-      if (node.type === "meteoraNode") {
-        const newBalancePosition = new Keypair();
-        extraSigners.push(newBalancePosition);
+      console.log("node.data.isActive:", node.data.isActive);
+      if (!node.data.isActive) continue;
 
-        const meteoraIx = await getMeteoraIxs(newBalancePosition, 5);
-        if (meteoraIx) instructions.push(...meteoraIx.slice(1));
+      if (node.type === "meteoraNode") {
+        const {
+          serviceType,
+          poolAddress,
+          totalRangeInterval,
+          strategyType,
+          inputTokenAmount,
+        } = node.data.args;
+
+        switch (serviceType) {
+          case "addLiquidity": {
+            const newBalancePosition = new Keypair();
+            extraSigners.push(newBalancePosition);
+
+            const meteoraIx = await meteoraInitLiquidity(
+              poolAddress,
+              totalRangeInterval,
+              strategyType,
+              inputTokenAmount,
+              newBalancePosition,
+              publicKey,
+              connection,
+            );
+            if (meteoraIx) instructions.push(...meteoraIx.slice(1));
+            break;
+          }
+          case "removeLiquidity": {
+            const meteoraIx = await meteoraRemoveLiquidity(
+              connection,
+              publicKey,
+              poolAddress,
+            );
+            if (meteoraIx) instructions.push(...meteoraIx.slice(1));
+            break;
+          }
+          default:
+            console.log("Unknown Meteora service type:", serviceType);
+        }
       } else if (node.type === "transferNode") {
         const { address, amount } = node.data.args;
 

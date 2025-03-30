@@ -1,13 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
+import { METEORA_POOLS } from "../../_constants/meteora.pools";
 
 interface MeteoraNodeProps {
   data: {
     label: string;
     args: {
+      serviceType: string;
       poolAddress: string;
       totalRangeInterval: string;
-      strategyType: string; // "0" for Spot, "1" for Curve, "2" for Bid Ask
+      strategyType: string;
       inputTokenAmount: string;
     };
     onRemove: () => void;
@@ -22,35 +24,42 @@ interface MeteoraNodeProps {
 export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
   const { label, args, onRemove, isActive, setActive, groupId, orderId, updateLabel } = data;
 
+  const [serviceType, setServiceType] = useState(args.serviceType || "");
   const [poolAddress, setPoolAddress] = useState(args.poolAddress || "");
   const [totalRangeInterval, setTotalRangeInterval] = useState(args.totalRangeInterval || "10");
-  const [strategyType, setStrategyType] = useState(args.strategyType || "0"); // Default to Spot
+  const [strategyType, setStrategyType] = useState(args.strategyType || "0");
   const [inputTokenAmount, setInputTokenAmount] = useState(args.inputTokenAmount || "");
   const [activeState, setActiveState] = useState(isActive);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(label);
 
-  // Sync local state with props when they change
   useEffect(() => {
     setActiveState(isActive);
   }, [isActive]);
   
-  // Sync args with local state
   useEffect(() => {
+    args.serviceType = serviceType;
     args.poolAddress = poolAddress;
     args.totalRangeInterval = totalRangeInterval;
     args.strategyType = strategyType;
     args.inputTokenAmount = inputTokenAmount;
-  }, [poolAddress, totalRangeInterval, strategyType, inputTokenAmount, args]);
+  }, [serviceType, poolAddress, totalRangeInterval, strategyType, inputTokenAmount, args]);
 
-  // Sync label state with props
   useEffect(() => {
     setLabelValue(label);
   }, [label]);
 
-  const handlePoolAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPoolAddress(e.target.value);
-    args.poolAddress = e.target.value;
+  const handleServiceTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setServiceType(e.target.value);
+    args.serviceType = e.target.value;
+  };
+
+  const handlePoolAddressChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedPool = METEORA_POOLS.find(pool => pool.id === e.target.value);
+    if (selectedPool) {
+      setPoolAddress(selectedPool.address);
+      args.poolAddress = selectedPool.address;
+    }
   };
 
   const handleTotalRangeIntervalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,28 +78,14 @@ export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
   };
 
   const handleIsActiveChange = () => {
-    // Log current states before update
-    console.log("MeteoraNode handleIsActiveChange:");
-    console.log("- Current local activeState:", activeState);
-    console.log("- Current props isActive:", isActive);
-    
-    // Update local state first for immediate UI feedback
     setActiveState(!activeState);
-    
-    // Call parent component's setActive function to update node data
-    console.log("- Calling setActive function...");
     setActive();
-    
-    // Log the expected new state
-    console.log("- Expected new activeState:", !activeState);
   };
 
   const handleRemoveClick = () => {
-    // Call parent component's onRemove function to remove the node
     onRemove();
   };
 
-  // Functions for label editing
   const handleEditClick = () => {
     setIsEditingLabel(true);
   };
@@ -110,10 +105,121 @@ export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
     if (e.key === 'Enter') {
       handleLabelSave();
     } else if (e.key === 'Escape') {
-      // Reset to original label and exit edit mode
       setLabelValue(label);
       setIsEditingLabel(false);
     }
+  };
+
+  const renderInputs = () => {
+    if (!serviceType) return null;
+
+    return (
+      <>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Pool
+          </label>
+          <select
+            value={METEORA_POOLS.find(pool => pool.address === poolAddress)?.id || ""}
+            onChange={handlePoolAddressChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          >
+            <option value="" disabled>Select a pool</option>
+            {METEORA_POOLS.map((pool) => (
+              <option key={pool.id} value={pool.id}>
+                {pool.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {serviceType === "addLiquidity" && (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Total Range Interval
+              </label>
+              <input
+                type="text"
+                value={totalRangeInterval}
+                onChange={handleTotalRangeIntervalChange}
+                className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+                placeholder="Enter total range interval"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Strategy Type
+              </label>
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <input
+                    id="spot"
+                    type="radio"
+                    value="0"
+                    checked={strategyType === "0"}
+                    onChange={handleStrategyTypeChange}
+                    className="mr-2"
+                  />
+                  <label htmlFor="spot" className="text-sm text-gray-700">
+                    Spot
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    id="curve"
+                    type="radio"
+                    value="1"
+                    checked={strategyType === "1"}
+                    onChange={handleStrategyTypeChange}
+                    className="mr-2"
+                  />
+                  <label htmlFor="curve" className="text-sm text-gray-700">
+                    Curve
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    id="bidAsk"
+                    type="radio"
+                    value="2"
+                    checked={strategyType === "2"}
+                    onChange={handleStrategyTypeChange}
+                    className="mr-2"
+                  />
+                  <label htmlFor="bidAsk" className="text-sm text-gray-700">
+                    Bid Ask
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Input Token Amount
+              </label>
+              <input
+                type="text"
+                value={inputTokenAmount}
+                onChange={handleInputTokenAmountChange}
+                className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+                placeholder="Enter input token amount"
+              />
+            </div>
+          </>
+        )}
+
+        {serviceType === "removeLiquidity" && (
+          <div className="mb-4">
+            <p className="text-sm text-gray-500 max-w-[200px]">
+              This operation will remove liquidity from your current position in the selected pool.
+              No additional inputs are required.
+            </p>
+          </div>
+        )}
+      </>
+    );
   };
 
   return (
@@ -173,89 +279,20 @@ export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
       <div className="mt-4">
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">
-            Pool Address
+            Service Type
           </label>
-          <input
-            type="text"
-            value={poolAddress}
-            onChange={handlePoolAddressChange}
+          <select
+            value={serviceType}
+            onChange={handleServiceTypeChange}
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-            placeholder="Enter pool address"
-          />
+          >
+            <option value="" disabled>Select a service</option>
+            <option value="addLiquidity">Add Liquidity</option>
+            <option value="removeLiquidity">Remove Liquidity</option>
+          </select>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Total Range Interval
-          </label>
-          <input
-            type="text"
-            value={totalRangeInterval}
-            onChange={handleTotalRangeIntervalChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-            placeholder="Enter total range interval"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Strategy Type
-          </label>
-          <div className="space-y-2">
-            <div className="flex items-center">
-              <input
-                id="spot"
-                type="radio"
-                value="0"
-                checked={strategyType === "0"}
-                onChange={handleStrategyTypeChange}
-                className="mr-2"
-              />
-              <label htmlFor="spot" className="text-sm text-gray-700">
-                Spot
-              </label>
-            </div>
-            <div className="flex items-center">
-              <input
-                id="curve"
-                type="radio"
-                value="1"
-                checked={strategyType === "1"}
-                onChange={handleStrategyTypeChange}
-                className="mr-2"
-              />
-              <label htmlFor="curve" className="text-sm text-gray-700">
-                Curve
-              </label>
-            </div>
-            <div className="flex items-center">
-              <input
-                id="bidAsk"
-                type="radio"
-                value="2"
-                checked={strategyType === "2"}
-                onChange={handleStrategyTypeChange}
-                className="mr-2"
-              />
-              <label htmlFor="bidAsk" className="text-sm text-gray-700">
-                Bid Ask
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Input Token Amount
-          </label>
-          <input
-            type="text"
-            value={inputTokenAmount}
-            onChange={handleInputTokenAmountChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-            placeholder="Enter input token amount"
-          />
-        </div>
+        {renderInputs()}
       </div>
     </div>
   );
