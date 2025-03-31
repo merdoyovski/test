@@ -61,7 +61,6 @@ export const meteoraRemoveLiquidity = async (
   }
 
   const dlmmPool = await DLMM.create(connection, new PublicKey(poolAddress));
-  const activeBin = await dlmmPool.getActiveBin();
   const { userPositions } =
     await dlmmPool.getPositionsByUserAndLbPair(publicKey);
 

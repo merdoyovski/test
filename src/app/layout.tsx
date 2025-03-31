@@ -16,12 +16,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable}`}>
-      <body>
+    <html lang="en" className={`${GeistSans.variable} h-full`}>
+      <body className="h-full overflow-hidden">
         <TRPCReactProvider>
           <SolanaWalletProvider>
             <Navigation />
-            <main>{children}</main>
+            <main className="h-[calc(100%-4rem)] overflow-hidden">{children}</main>
           </SolanaWalletProvider>
         </TRPCReactProvider>
       </body>

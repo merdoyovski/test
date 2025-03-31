@@ -32,7 +32,7 @@ export const FlowArea = ({
   const nodeTypes = useMemo(() => nodeTemplates, []);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -40,9 +40,11 @@ export const FlowArea = ({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
+        fitView
+        className="h-full w-full"
       >
         <Background />
-        <Controls />
+       
       </ReactFlow>
     </div>
   );

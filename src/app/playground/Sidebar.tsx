@@ -16,12 +16,13 @@ import {
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { BuildSwapTransaction, GetQuote } from "../_services/jupiter";
 import { TOKENS } from "../_constants/tokens";
-import DLMM, { autoFillYByStrategy, StrategyType } from "@meteora-ag/dlmm";
-import { BN } from "@coral-xyz/anchor";
+
 import {
   meteoraInitLiquidity,
   meteoraRemoveLiquidity,
 } from "../_services/meteora";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 // Define the localStorage key for saving workflow
 const WORKFLOW_STORAGE_KEY = "bflow-workflow-data";
@@ -530,9 +531,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     }, 10);
   };
 
-  const handleAddTransferNode = () => {
-    const newCounter = nodes.length + 1;
-
+  const handleAddTransferNode = (address: string = "", amount: string = "") => {
     const orderId = getNextOrderId();
     const newNodeId = `transfer-${orderId}`;
     const groupId = 1; // Default group
@@ -561,8 +560,8 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         label: `Transfer (${fileCounter.current++})`,
         isActive: initialIsActive,
         args: {
-          address: "",
-          amount: "",
+          address: address,
+          amount: amount,
         },
         groupId,
         orderId,
@@ -849,7 +848,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
 
   const handleExecuteWorkflow = async () => {
     if (publicKey === null) {
-      console.log("No wallet connected");
+      toast.error("No wallet connected");
       return;
     }
 
@@ -857,6 +856,12 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     const extraSigners: Keypair[] = [];
 
     let addressLookupTableAccounts;
+
+    // Show initial toast
+
+    const toastId = toast.info("Creating the Transaction", {
+      autoClose: false,
+    });
 
     for (const node of nodes) {
       console.log("node.data.isActive:", node.data.isActive);
@@ -906,9 +911,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         instructions.push(
           SystemProgram.transfer({
             fromPubkey: publicKey,
-
             toPubkey: new PublicKey(address),
-
             lamports: amount,
           }),
         );
@@ -949,12 +952,9 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
 
               return new AddressLookupTableAccount({
                 key: lookup.accountKey,
-
                 state: AddressLookupTableAccount.deserialize(
                   await connection
-
                     .getAccountInfo(lookup.accountKey)
-
                     .then((res) => res!.data),
                 ),
               });
@@ -971,7 +971,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     }
 
     if (instructions.length === 0) {
-      console.log("No instructions to execute");
+      toast.error("No instructions to execute");
       return;
     }
 
@@ -992,16 +992,82 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
 
       const estimateTx = await connection.simulateTransaction(transaction);
       console.log("Estimated transaction cost:", estimateTx);
+
+      toast.update(toastId, {
+        render: "Waiting for Signature",
+      });
+      // Send transaction
       const signature = await sendTransaction(transaction, connection);
       console.log("Transaction sent:", signature);
+
+      // Update the waiting toast to success
+      toast.update(toastId, {
+        render: "Transaction Sent! Waiting for confirmation",
+        type: "success",
+      });
+
+      // Wait for confirmation
+      const confirmation = await connection.confirmTransaction(signature);
+      if (confirmation.value.err) {
+        toast.update(toastId, {
+          render: (
+            <div className="flex items-center gap-2">
+              <span>Transaction Failed!</span>
+              <a
+                href={`https://explorer.solana.com/tx/${signature}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-700"
+              >
+                🔗
+              </a>
+            </div>
+          ),
+          type: "error",
+          autoClose: 5000,
+        });
+      } else {
+        toast.update(toastId, {
+          render: (
+            <div className="flex items-center gap-2">
+              <span>Transaction Confirmed</span>
+              <a
+                href={`https://explorer.solana.com/tx/${signature}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-700"
+              >
+                🔗
+              </a>
+            </div>
+          ),
+          type: "success",
+          autoClose: 5000,
+        });
+      }
     } catch (error) {
       console.error("Transaction failed:", error);
+      toast.update(toastId, {
+        render: "Transaction Failed!",
+        type: "error",
+        autoClose: 5000,
+      });
     }
   };
 
   // Add handleAddJupiterNode function
-  const handleAddJupiterNode = () => {
+  const handleAddJupiterNode = (
+    sellingToken: string = TOKENS[0]?.id || "SOL",
+    buyingToken: string = TOKENS[1]?.id || "USDC",
+    swapAmount: string = "",
+    slippage: string = "",
+  ) => {
     const newCounter = nodes.length + 1;
+    console.log("calling handleAddJupiterNode");
+    console.log("sellingToken:", sellingToken);
+    console.log("buyingToken:", buyingToken);
+    console.log("swapAmount:", swapAmount);
+    console.log("slippage:", slippage);
 
     const orderId = getNextOrderId();
     const newNodeId = `jupiter-${orderId}`;
@@ -1035,10 +1101,10 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         label: `Jupiter Swap (${fileCounter.current++})`,
         isActive: initialIsActive,
         args: {
-          sellingToken: defaultSellingToken,
-          buyingToken: defaultBuyingToken,
-          swapAmount: "",
-          slippage: "1",
+          sellingToken: sellingToken,
+          buyingToken: buyingToken,
+          swapAmount: swapAmount,
+          slippage: slippage,
         },
         groupId,
         orderId,
@@ -1099,13 +1165,43 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     setNodes((prevNodes) => [...prevNodes, meteoraNode]);
   };
 
+  // Add event handlers for node creation
+  useEffect(() => {
+    const handleTransferNode = (event: CustomEvent) => {
+      const { address, amount } = event.detail;
+      handleAddTransferNode(address, amount);
+    };
+
+    const handleJupiterNode = (event: CustomEvent) => {
+      const { sellingToken, buyingToken, swapAmount, slippage } = event.detail;
+      handleAddJupiterNode(sellingToken, buyingToken, swapAmount, slippage);
+    };
+
+    window.addEventListener(
+      "createTransferNode",
+      handleTransferNode as EventListener,
+    );
+    window.addEventListener(
+      "createJupiterNode",
+      handleJupiterNode as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "createTransferNode",
+        handleTransferNode as EventListener,
+      );
+      window.removeEventListener(
+        "createJupiterNode",
+        handleJupiterNode as EventListener,
+      );
+    };
+  }, []);
+
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="w-96 border-l border-gray-200 p-6 text-black">
-        <h1 className="items-centered mb-4 flex w-full justify-center text-2xl font-bold">
-          bFlow
-        </h1>
-
+      <div className="w-96 border-r border-gray-200 p-6 text-black">
+        <div className="w-full"></div>
         {/* File upload section */}
         <h2 className="mb-2 text-lg font-semibold">Actions</h2>
         <div className="mb-6">
@@ -1204,7 +1300,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         {/* Transfer node button */}
         <div
           className="flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
-          onClick={handleAddTransferNode}
+          onClick={() => handleAddTransferNode()}
         >
           Send Transfer
         </div>
@@ -1212,7 +1308,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         {/* Jupiter node button */}
         <div
           className="mt-2 flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
-          onClick={handleAddJupiterNode}
+          onClick={() => handleAddJupiterNode()}
         >
           Jupiter Swap
         </div>
@@ -1226,7 +1322,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         </div>
 
         {/* Current Nodes Section with Drag and Drop */}
-        {sidebarNodes.length > 0 && (
+        {/*sidebarNodes.length > 0 && (
           <div className="mt-6">
             <h2 className="mb-2 text-lg font-semibold">Current Nodes</h2>
             <div className="max-h-60 overflow-y-auto rounded-md border border-gray-200 p-2">
@@ -1237,7 +1333,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
                 ))}
             </div>
           </div>
-        )}
+        )*/}
 
         {/* Save/Load Workflow Buttons */}
         <div className="mt-6 flex space-x-2">
@@ -1272,6 +1368,20 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         >
           Execute Workflow
         </div>
+
+        {/* Add ToastContainer at the end of the component */}
+        <ToastContainer
+          position="bottom-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </div>
     </DndProvider>
   );

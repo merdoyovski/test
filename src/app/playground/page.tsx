@@ -388,8 +388,16 @@ export default function Playground() {
   };
 
   return (
-    <div className="flex h-screen w-full flex-col">
-      <WorkflowTabs
+    <div className="flex h-full w-full flex-col overflow-hidden">
+   
+      <div className="flex flex-1 overflow-hidden">
+        <SideBar
+          setNodes={setNodes}
+          nodes={nodes}
+          workflowId={activeWorkflowId}
+        />
+        <div className="flex-1 overflow-hidden">
+        <WorkflowTabs
         workflows={workflows}
         activeWorkflowId={activeWorkflowId}
         onSelectWorkflow={handleSelectWorkflow}
@@ -397,19 +405,14 @@ export default function Playground() {
         onRenameWorkflow={handleRenameWorkflow}
         onCloseWorkflow={handleCloseWorkflow}
       />
-      <div className="flex flex-1 overflow-hidden">
-        <FlowArea
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-        />
-        <SideBar
-          setNodes={setNodes}
-          nodes={nodes}
-          workflowId={activeWorkflowId}
-        />
+          <FlowArea
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+          />
+        </div>
       </div>
     </div>
   );

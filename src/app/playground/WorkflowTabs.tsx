@@ -92,7 +92,7 @@ export const WorkflowTabs: React.FC<WorkflowTabsProps> = ({
         {workflows.map((workflow) => (
           <div
             key={workflow.id}
-            className={`mr-1 flex h-9 min-w-[120px] max-w-[200px] cursor-pointer select-none items-center rounded-t-lg px-3 py-1 ${
+            className={`mr-1 flex h-9 min-w-[120px] max-w-[200px] mt-1 cursor-pointer select-none items-center rounded-t-lg px-3 py-1 ${
               workflow.id === activeWorkflowId
                 ? "border-x border-b-0 border-t-2 border-gray-200 border-t-blue-500 bg-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
