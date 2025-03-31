@@ -1,11 +1,12 @@
 import OpenAI from 'openai';
 
 // Initialize OpenAI client
+/*
 const openai = new OpenAI({
   apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
   dangerouslyAllowBrowser: true
 });
-
+*/
 interface NodeCreationResponse {
   type: 'transfer' | 'jupiter' | null;
   params: {
@@ -19,9 +20,11 @@ interface NodeCreationResponse {
 }
 
 export async function sendMessageToOpenAI(message: string): Promise<NodeCreationResponse> {
+    return { type: null, params: {} };
+   /*
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -69,4 +72,5 @@ export async function sendMessageToOpenAI(message: string): Promise<NodeCreation
     console.error('Error sending message to OpenAI:', error);
     throw error;
   }
+    */
 } 
