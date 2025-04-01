@@ -7,7 +7,7 @@ export default async function Home() {
 
   return (
     <HydrateClient>
-      <div>Hello</div>
+      <div className="w-full h-full bg-gray-200">Hello</div>
     </HydrateClient>
   );
 }

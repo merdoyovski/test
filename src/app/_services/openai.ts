@@ -1,14 +1,14 @@
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 // Initialize OpenAI client
 /*
 const openai = new OpenAI({
   apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
+  dangerouslyAllowBrowser: true,
 });
 */
 interface NodeCreationResponse {
-  type: 'transfer' | 'jupiter' | null;
+  type: "transfer" | "jupiter" | null;
   params: {
     address?: string;
     amount?: string;
@@ -19,12 +19,14 @@ interface NodeCreationResponse {
   };
 }
 
-export async function sendMessageToOpenAI(message: string): Promise<NodeCreationResponse> {
-    return { type: null, params: {} };
-   /*
+export async function sendMessageToOpenAI(
+  message: string,
+): Promise<NodeCreationResponse> {
+  return { type: null, params: {} };
+  /*
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
@@ -47,7 +49,7 @@ export async function sendMessageToOpenAI(message: string): Promise<NodeCreation
           - swapAmount: the amount to swap
           - slippage: the slippage tolerance (default: '1')
           
-          If the request is unclear or not related to node creation, return type: null and empty params.`
+          If the request is unclear or not related to node creation, return type: null and empty params.`,
         },
         {
           role: "user",
@@ -65,12 +67,12 @@ export async function sendMessageToOpenAI(message: string): Promise<NodeCreation
       const response = JSON.parse(content);
       return response as NodeCreationResponse;
     } catch (error) {
-      console.error('Error parsing AI response:', error);
+      console.error("Error parsing AI response:", error);
       return { type: null, params: {} };
     }
   } catch (error) {
-    console.error('Error sending message to OpenAI:', error);
+    console.error("Error sending message to OpenAI:", error);
     throw error;
   }
     */
-} 
+}

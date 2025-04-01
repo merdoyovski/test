@@ -6,12 +6,18 @@ import { SideBar } from "./Sidebar";
 import { useState, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { WorkflowTabs, Workflow } from "./WorkflowTabs";
+import { usePathname } from "next/navigation";
+import Sidebar from "./Sidebar";
+import { Node } from "reactflow";
 
 // Constants
 const WORKFLOWS_KEY = "bflow_workflows";
 const DEFAULT_WORKFLOW_NAME = "Untitled Workflow";
 
-export default function Playground() {
+export default function PlaygroundPage() {
+  const pathname = usePathname();
+  const isPlayground = pathname === "/playground";
+
   const [userAddress, setUserAddress] = useState("mert");
   /*  const { data, isLoading, error } = useQuery({
     queryKey: ["workflowAll", userAddress],
@@ -388,23 +394,17 @@ export default function Playground() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
-   
-      <div className="flex flex-1 overflow-hidden">
-        <SideBar
-          setNodes={setNodes}
-          nodes={nodes}
-          workflowId={activeWorkflowId}
+    <div className="relative flex h-screen">
+      <div className="flex flex-1 flex-col">
+        <WorkflowTabs
+          workflows={workflows}
+          activeWorkflowId={activeWorkflowId}
+          onSelectWorkflow={handleSelectWorkflow}
+          onAddWorkflow={handleAddWorkflow}
+          onRenameWorkflow={handleRenameWorkflow}
+          onCloseWorkflow={handleCloseWorkflow}
         />
         <div className="flex-1 overflow-hidden">
-        <WorkflowTabs
-        workflows={workflows}
-        activeWorkflowId={activeWorkflowId}
-        onSelectWorkflow={handleSelectWorkflow}
-        onAddWorkflow={handleAddWorkflow}
-        onRenameWorkflow={handleRenameWorkflow}
-        onCloseWorkflow={handleCloseWorkflow}
-      />
           <FlowArea
             nodes={nodes}
             edges={edges}
@@ -414,6 +414,15 @@ export default function Playground() {
           />
         </div>
       </div>
+      {isPlayground && (
+        <div className="absolute left-0 top-1/2 z-10 h-[70vh] -translate-y-1/2 bg-white">
+          <Sidebar
+            nodes={nodes}
+            setNodes={setNodes}
+            workflowId={activeWorkflowId}
+          />
+        </div>
+      )}
     </div>
   );
 }

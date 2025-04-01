@@ -23,6 +23,25 @@ import {
 } from "../_services/meteora";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import {
+  Button,
+  FileButton,
+  Group,
+  Stack,
+  Text,
+  Paper,
+  ScrollArea,
+  ActionIcon,
+  rem,
+} from "@mantine/core";
+import {
+  IconUpload,
+  IconTrash,
+  IconX,
+  IconChevronLeft,
+  IconChevronRight,
+} from "@tabler/icons-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Define the localStorage key for saving workflow
 const WORKFLOW_STORAGE_KEY = "bflow-workflow-data";
@@ -78,7 +97,8 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   const [sidebarNodes, setSidebarNodes] = useState<SidebarNodeItem[]>([]);
   // State to track if we've loaded from localStorage
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
-
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   // Create a workflow-specific storage key (memoized to prevent dependency issues)
   const getWorkflowStorageKey = useCallback(() => {
     return `${WORKFLOW_STORAGE_KEY}_${workflowId}`;
@@ -575,8 +595,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   };
 
   // Modified to store the file data instead of creating a node immediately
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileUpload = (file: File | null) => {
     if (!file) return;
 
     const reader = new FileReader();
@@ -617,7 +636,6 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
             console.log("Saved to global storage");
             const test = localStorage.getItem(GLOBAL_PROGRAMS_STORAGE_KEY);
             console.log("Test:", test);
-            // Still call saveWorkflow but don't rely on it for saving global programs
 
             return updatedFiles;
           });
@@ -628,9 +646,6 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
       }
     };
     reader.readAsText(file);
-
-    // Reset the file input so the same file can be uploaded again if needed
-    event.target.value = "";
   };
 
   // Handle creating an ActionNode when a file is clicked
@@ -737,116 +752,10 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     setNodes((prevNodes) => [...prevNodes, actionNode]);
   };
 
-  // Function to move a node in the sidebar (change its order)
-  const moveNode = (dragIndex: number, hoverIndex: number) => {
-    setSidebarNodes((prevNodes) => {
-      const newNodes = [...prevNodes];
-      // Safety check to ensure dragIndex is valid
-      if (dragIndex >= 0 && dragIndex < newNodes.length) {
-        const draggedNode = newNodes[dragIndex];
-        if (draggedNode) {
-          // Remove the dragged node
-          newNodes.splice(dragIndex, 1);
-          // Insert it at the new position
-          newNodes.splice(hoverIndex, 0, draggedNode);
-
-          // Update order IDs for all nodes
-          newNodes.forEach((node, index) => {
-            node.orderId = index + 1;
-          });
-        }
-      }
-      return newNodes;
-    });
-    // Note: We no longer update the flow nodes here.
-    // That's now handled by the useEffect hook
-  };
-
-  // Draggable node component for the sidebar
-  const DraggableNodeItem = ({
-    node,
-    index,
-  }: {
-    node: SidebarNodeItem;
-    index: number;
-  }) => {
-    const [{ isDragging }, drag] = useDrag({
-      type: "NODE",
-      item: { index },
-      collect: (monitor) => ({
-        isDragging: monitor.isDragging(),
-      }),
-    });
-
-    const [, drop] = useDrop({
-      accept: "NODE",
-      hover: (item: { index: number }, monitor: any) => {
-        if (!drag) {
-          return;
-        }
-        const dragIndex = item.index;
-        const hoverIndex = index;
-
-        // Don't replace items with themselves
-        if (dragIndex === hoverIndex) {
-          return;
-        }
-
-        moveNode(dragIndex, hoverIndex);
-
-        // Update the dragged item's index
-        item.index = hoverIndex;
-      },
-    });
-
-    // Determine background color based on node type and active state
-    const getBgColor = () => {
-      if (!node.isActive) return "bg-red-100"; // Red background for inactive nodes
-      return node.type === "action" ? "bg-blue-50" : "bg-green-50";
-    };
-
-    return (
-      <div
-        ref={(node) => {
-          const nodeRef = node as HTMLDivElement | null;
-          drop(drag(nodeRef));
-        }}
-        className={`mb-1 flex cursor-move items-center justify-between rounded p-2 ${
-          isDragging ? "bg-gray-100 opacity-50" : "opacity-100"
-        } ${getBgColor()}`}
-      >
-        <div className="flex items-center">
-          <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-xs">
-            {node.orderId}
-          </span>
-          <div>
-            <div className="font-medium">{node.name}</div>
-            <div className="text-xs text-gray-500">
-              <span>Group: {node.groupId}</span>
-              {!node.isActive && (
-                <span className="ml-2 font-medium text-red-500">INACTIVE</span>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="text-xs font-medium uppercase text-gray-500">
-          {node.type}
-        </div>
-      </div>
-    );
-  };
-
-  const handleLogging = () => {
-    console.log("Nodes:", nodes);
-    const workflowState = localStorage.getItem("bflow_workflows");
-    if (workflowState) {
-      console.log("Workflow data:", JSON.parse(workflowState));
-    } else {
-      console.log("No workflow data found");
-    }
-  };
-
   const handleExecuteWorkflow = async () => {
+    console.log("handleExecuteWorkflow");
+    console.log("nodes: ", nodes);
+
     if (publicKey === null) {
       toast.error("No wallet connected");
       return;
@@ -997,6 +906,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         render: "Waiting for Signature",
       });
       // Send transaction
+      return;
       const signature = await sendTransaction(transaction, connection);
       console.log("Transaction sent:", signature);
 
@@ -1199,190 +1109,223 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   }, []);
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="w-96 border-r border-gray-200 p-6 text-black">
-        <div className="w-full"></div>
-        {/* File upload section */}
-        <h2 className="mb-2 text-lg font-semibold">Actions</h2>
-        <div className="mb-6">
-          <label
-            htmlFor="file-upload"
-            className="flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
-          >
-            Upload IDL File
-          </label>
-          <input
-            id="file-upload"
-            type="file"
-            accept=".json"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-        </div>
-
-        {/* Uploaded files section */}
-        {uploadedFiles.length > 0 && (
-          <div className="mb-6">
-            <h2 className="mb-2 text-lg font-semibold">
-              Available Programs ({uploadedFiles.length})
-            </h2>
-            <div className="max-h-60 overflow-y-auto rounded-md border border-gray-200">
-              {uploadedFiles.map((file, index) => {
-                // Ensure we have a valid display name
-                const fileName = file.name || `File ${index + 1}`;
-                const displayName = fileName.includes(".")
-                  ? fileName.split(".")[0]
-                  : fileName;
-
-                return (
-                  <div
-                    key={`${fileName}-${index}`}
-                    className="cursor-pointer border-b border-gray-200 px-4 py-2 hover:bg-gray-50"
-                    onClick={() => handleCreateActionNode(file)}
-                  >
-                    <div className="flex justify-between">
-                      <div className="font-medium">{displayName}</div>
-                      <button
-                        className="text-xs text-red-500 hover:text-red-700"
-                        onClick={(e) => {
-                          e.stopPropagation(); // Don't create node when clicking remove
-                          if (confirm(`Remove program "${displayName}"?`)) {
-                            setUploadedFiles((prev) => {
-                              const updated = prev.filter(
-                                (_, i) => i !== index,
-                              );
-                              // Save change to global storage
-                              localStorage.setItem(
-                                GLOBAL_PROGRAMS_STORAGE_KEY,
-                                JSON.stringify(updated),
-                              );
-                              return updated;
-                            });
-                            // Save workflow changes
-                            setTimeout(() => saveWorkflow(false), 100);
-                          }
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {file.instructions.length} instructions • Added{" "}
-                      {new Date(file.timestamp).toLocaleString()}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-2 flex justify-end">
-              <button
-                className="text-xs text-blue-500 hover:text-blue-700"
-                onClick={() => {
-                  if (
-                    confirm(
-                      `Clear all ${uploadedFiles.length} programs? This cannot be undone.`,
-                    )
-                  ) {
-                    setUploadedFiles([]);
-                    // Save change to global storage
-                    localStorage.removeItem(GLOBAL_PROGRAMS_STORAGE_KEY);
-                    // Save workflow changes
-                    setTimeout(() => saveWorkflow(false), 100);
-                  }
-                }}
-              >
-                Clear All Programs
-              </button>
-            </div>
-          </div>
+    <div className="relative flex h-full items-center">
+      <motion.button
+        initial={false}
+        animate={{
+          left: isCollapsed ? 0 : "calc(100% - 16px)", // Moves button inside sidebar
+          opacity: isVisible ? 1 : 0, // Toggles visibility
+        }}
+        transition={{
+          left: { duration: 0.6, ease: "easeInOut" }, // Smooth movement
+          opacity: { duration: 0.1, ease: "linear" }, // Quick fade effect
+        }}
+        onClick={() => {
+          setIsVisible(false); // Fade out instantly
+          setTimeout(() => {
+            setIsCollapsed(!isCollapsed); // Start collapse
+          }, 100); // Short delay before movement
+        }}
+        onAnimationComplete={() => {
+          setTimeout(() => setIsVisible(true), 550); // Fade back in after movement
+        }}
+        className="absolute top-1/2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-50"
+        style={{ transform: "translateY(-50%)" }} // Center vertically
+      >
+        {isCollapsed ? (
+          <IconChevronRight size={16} className="text-gray-600" />
+        ) : (
+          <IconChevronLeft size={16} className="text-gray-600" />
         )}
+      </motion.button>
 
-        {/* Transfer node button */}
-        <div
-          className="flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
-          onClick={() => handleAddTransferNode()}
-        >
-          Send Transfer
-        </div>
+      <motion.div
+        initial={false}
+        animate={{
+          width: isCollapsed ? 0 : 224, // 56px = 14rem
+          opacity: isCollapsed ? 0 : 1,
+        }}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
+        className="h-[calc(100%-2rem)] overflow-hidden"
+      >
+        <Paper className="border-charcoal-gray h-full w-56 border border-l-0 p-6">
+          <Stack gap="md">
+            {/* File upload section */}
+            <Text fw={600} ta="center" size="lg">
+              Actions
+            </Text>
 
-        {/* Jupiter node button */}
-        <div
-          className="mt-2 flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
-          onClick={() => handleAddJupiterNode()}
-        >
-          Jupiter Swap
-        </div>
+            <FileButton
+              onChange={handleFileUpload}
+              accept=".json"
+              multiple={false}
+            >
+              {(props) => (
+                <Button
+                  {...props}
+                  variant="light"
+                  leftSection={<IconUpload size={16} />}
+                  fullWidth
+                >
+                  Anchor IDL
+                </Button>
+              )}
+            </FileButton>
 
-        {/* Meteora node button */}
-        <div
-          className="mt-2 flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
-          onClick={handleAddMeteoraNode}
-        >
-          Meteora LP
-        </div>
+            {/* Uploaded files section */}
+            {uploadedFiles.length > 0 && (
+              <Stack gap="xs">
+                <Text fw={600} size="lg">
+                  Available Programs ({uploadedFiles.length})
+                </Text>
+                <ScrollArea h={240}>
+                  <Stack gap="xs">
+                    {uploadedFiles.map((file, index) => {
+                      const fileName = file.name || `File ${index + 1}`;
+                      const displayName = fileName.includes(".")
+                        ? fileName.split(".")[0]
+                        : fileName;
 
-        {/* Current Nodes Section with Drag and Drop */}
-        {/*sidebarNodes.length > 0 && (
-          <div className="mt-6">
-            <h2 className="mb-2 text-lg font-semibold">Current Nodes</h2>
-            <div className="max-h-60 overflow-y-auto rounded-md border border-gray-200 p-2">
-              {sidebarNodes
-                .sort((a, b) => a.orderId - b.orderId)
-                .map((node, index) => (
-                  <DraggableNodeItem key={node.id} node={node} index={index} />
-                ))}
-            </div>
-          </div>
-        )*/}
+                      return (
+                        <Paper
+                          key={`${fileName}-${index}`}
+                          p="xs"
+                          withBorder
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleCreateActionNode(file)}
+                        >
+                          <Group justify="space-between">
+                            <div>
+                              <Text fw={500}>{displayName}</Text>
+                              <Text size="xs" c="dimmed">
+                                {file.instructions.length} instructions • Added{" "}
+                                {new Date(file.timestamp).toLocaleString()}
+                              </Text>
+                            </div>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (
+                                  confirm(`Remove program "${displayName}"?`)
+                                ) {
+                                  setUploadedFiles((prev) => {
+                                    const updated = prev.filter(
+                                      (_, i) => i !== index,
+                                    );
+                                    localStorage.setItem(
+                                      GLOBAL_PROGRAMS_STORAGE_KEY,
+                                      JSON.stringify(updated),
+                                    );
+                                    return updated;
+                                  });
+                                  setTimeout(() => saveWorkflow(false), 100);
+                                }
+                              }}
+                            >
+                              <IconTrash size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                </ScrollArea>
+                <Button
+                  variant="subtle"
+                  color="red"
+                  size="xs"
+                  onClick={() => {
+                    if (
+                      confirm(
+                        `Clear all ${uploadedFiles.length} programs? This cannot be undone.`,
+                      )
+                    ) {
+                      setUploadedFiles([]);
+                      localStorage.removeItem(GLOBAL_PROGRAMS_STORAGE_KEY);
+                      setTimeout(() => saveWorkflow(false), 100);
+                    }
+                  }}
+                >
+                  Clear All Programs
+                </Button>
+              </Stack>
+            )}
 
-        {/* Save/Load Workflow Buttons */}
-        <div className="mt-6 flex space-x-2">
-          <button
-            className="flex-1 rounded-md bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-600"
-            onClick={() => saveWorkflow(true)}
-          >
-            Save Workflow
-          </button>
-          <button
-            className="flex-1 rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-600"
-            onClick={clearSavedWorkflow}
-          >
-            Clear Saved
-          </button>
-        </div>
+            {/* Action Buttons */}
+            <Button
+              variant="light"
+              color="blue"
+              fullWidth
+              onClick={() => handleAddTransferNode()}
+            >
+              SOL Transfer
+            </Button>
 
-        {/* Log button */}
-        <div
-          className="mt-4 flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
-          onClick={() => {
-            handleLogging();
-          }}
-        >
-          Log
-        </div>
-        <div
-          className="mt-4 flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
-          onClick={() => {
-            handleExecuteWorkflow();
-          }}
-        >
-          Execute Workflow
-        </div>
+            <Button
+              variant="light"
+              color="blue"
+              fullWidth
+              onClick={() => handleAddJupiterNode()}
+            >
+              Jupiter Swap
+            </Button>
 
-        {/* Add ToastContainer at the end of the component */}
-        <ToastContainer
-          position="bottom-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
-      </div>
-    </DndProvider>
+            <Button
+              variant="light"
+              color="blue"
+              fullWidth
+              onClick={handleAddMeteoraNode}
+            >
+              Meteora DLMM
+            </Button>
+
+            {/* <Group gap="xs">
+              <Button
+                variant="filled"
+                color="blue"
+                fullWidth
+                onClick={() => saveWorkflow(true)}
+              >
+                Save Workflow
+              </Button>
+              <Button
+                variant="light"
+                color="red"
+                fullWidth
+                onClick={clearSavedWorkflow}
+              >
+                Clear Saved
+              </Button>
+            </Group> */}
+
+            <Button
+              variant="filled"
+              color="blue"
+              fullWidth
+              onClick={() => handleExecuteWorkflow()}
+            >
+              Execute Workflow
+            </Button>
+
+            <ToastContainer
+              position="bottom-right"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+            />
+          </Stack>
+        </Paper>
+      </motion.div>
+    </div>
   );
 };
+
+export default SideBar;

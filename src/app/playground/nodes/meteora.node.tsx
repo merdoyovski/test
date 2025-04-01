@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { METEORA_POOLS } from "../../_constants/meteora.pools";
+import { Select, TextInput, Radio, Text, Group, Checkbox } from '@mantine/core';
 
 interface MeteoraNodeProps {
   data: {
@@ -116,94 +117,63 @@ export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
     return (
       <>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Pool
-          </label>
-          <select
+          <Select
+            label="Pool"
+            placeholder="Select a pool"
             value={METEORA_POOLS.find(pool => pool.address === poolAddress)?.id || ""}
-            onChange={handlePoolAddressChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          >
-            <option value="" disabled>Select a pool</option>
-            {METEORA_POOLS.map((pool) => (
-              <option key={pool.id} value={pool.id}>
-                {pool.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => {
+              const selectedPool = METEORA_POOLS.find(pool => pool.id === value);
+              if (selectedPool) {
+                setPoolAddress(selectedPool.address);
+                args.poolAddress = selectedPool.address;
+              }
+            }}
+            data={METEORA_POOLS.map((pool) => ({
+              value: pool.id,
+              label: pool.name
+            }))}
+          />
         </div>
 
         {serviceType === "addLiquidity" && (
           <>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Total Range Interval
-              </label>
-              <input
-                type="text"
+              <TextInput
+                label="Total Range Interval"
                 value={totalRangeInterval}
-                onChange={handleTotalRangeIntervalChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+                onChange={(e) => {
+                  setTotalRangeInterval(e.target.value);
+                  args.totalRangeInterval = e.target.value;
+                }}
                 placeholder="Enter total range interval"
               />
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Strategy Type
-              </label>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input
-                    id="spot"
-                    type="radio"
-                    value="0"
-                    checked={strategyType === "0"}
-                    onChange={handleStrategyTypeChange}
-                    className="mr-2"
-                  />
-                  <label htmlFor="spot" className="text-sm text-gray-700">
-                    Spot
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="curve"
-                    type="radio"
-                    value="1"
-                    checked={strategyType === "1"}
-                    onChange={handleStrategyTypeChange}
-                    className="mr-2"
-                  />
-                  <label htmlFor="curve" className="text-sm text-gray-700">
-                    Curve
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="bidAsk"
-                    type="radio"
-                    value="2"
-                    checked={strategyType === "2"}
-                    onChange={handleStrategyTypeChange}
-                    className="mr-2"
-                  />
-                  <label htmlFor="bidAsk" className="text-sm text-gray-700">
-                    Bid Ask
-                  </label>
-                </div>
-              </div>
+              <Text size="sm" fw={500} mb="xs">Strategy Type</Text>
+              <Radio.Group
+                value={strategyType}
+                onChange={(value) => {
+                  setStrategyType(value);
+                  args.strategyType = value;
+                }}
+              >
+                <Group gap="xl">
+                  <Radio value="0" label="Spot" size="sm" />
+                  <Radio value="1" label="Curve" size="sm" />
+                  <Radio value="2" label="Bid Ask" size="sm" />
+                </Group>
+              </Radio.Group>
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Input Token Amount
-              </label>
-              <input
-                type="text"
+              <TextInput
+                label="Input Token Amount"
                 value={inputTokenAmount}
-                onChange={handleInputTokenAmountChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+                onChange={(e) => {
+                  setInputTokenAmount(e.target.value);
+                  args.inputTokenAmount = e.target.value;
+                }}
                 placeholder="Enter input token amount"
               />
             </div>
@@ -212,10 +182,10 @@ export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
 
         {serviceType === "removeLiquidity" && (
           <div className="mb-4">
-            <p className="text-sm text-gray-500 max-w-[200px]">
+            <Text size="sm" c="dimmed" maw={200}>
               This operation will remove liquidity from your current position in the selected pool.
               No additional inputs are required.
-            </p>
+            </Text>
           </div>
         )}
       </>
@@ -241,13 +211,12 @@ export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
         </button>
       </div>
       <div className="absolute left-2 top-2 flex">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={activeState}
           onChange={handleIsActiveChange}
-          className="mr-2"
+          size="xs"
+          label="Active"
         />
-        <label className="text-sm font-medium text-gray-700">Active</label>
       </div>
 
       {isEditingLabel ? (
@@ -278,18 +247,19 @@ export const MeteoraNode = ({ data }: MeteoraNodeProps) => {
 
       <div className="mt-4">
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Service Type
-          </label>
-          <select
+          <Select
+            label="Service Type"
+            placeholder="Select a service"
             value={serviceType}
-            onChange={handleServiceTypeChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          >
-            <option value="" disabled>Select a service</option>
-            <option value="addLiquidity">Add Liquidity</option>
-            <option value="removeLiquidity">Remove Liquidity</option>
-          </select>
+            onChange={(value) => {
+              setServiceType(value || "");
+              args.serviceType = value || "";
+            }}
+            data={[
+              { value: "addLiquidity", label: "Add Liquidity" },
+              { value: "removeLiquidity", label: "Remove Liquidity" }
+            ]}
+          />
         </div>
 
         {renderInputs()}

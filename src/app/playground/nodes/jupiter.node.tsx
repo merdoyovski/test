@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { TOKENS } from "../../_constants/tokens";
+import { Select, TextInput, Checkbox } from '@mantine/core';
 
 interface JupiterNodeProps {
   data: {
@@ -127,13 +128,12 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
         </button>
       </div>
       <div className="absolute left-2 top-2 flex">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={activeState}
           onChange={handleIsActiveChange}
-          className="mr-2"
+          size="xs"
+          label="Active"
         />
-        <label className="text-sm font-medium text-gray-700">Active</label>
       </div>
 
       {isEditingLabel ? (
@@ -164,67 +164,55 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
 
       <div className="mt-4">
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Selling Token
-          </label>
-          <select
+          <Select
+            label="Selling Token"
             value={sellingToken}
-            onChange={(e) => {
-              setSellingToken(e.target.value);
-              args.sellingToken = e.target.value;
+            onChange={(value) => {
+              setSellingToken(value || "");
+              args.sellingToken = value || "";
             }}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          >
-            {TOKENS.map((token) => (
-              <option key={`sell-${token.id}`} value={token.id}>
-                {token.name}
-              </option>
-            ))}
-          </select>
+            data={TOKENS.map((token) => ({
+              value: token.id,
+              label: token.name
+            }))}
+          />
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Buying Token
-          </label>
-          <select
+          <Select
+            label="Buying Token"
             value={buyingToken}
-            onChange={(e) => {
-              setBuyingToken(e.target.value);
-              args.buyingToken = e.target.value;
+            onChange={(value) => {
+              setBuyingToken(value || "");
+              args.buyingToken = value || "";
             }}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          >
-            {TOKENS.map((token) => (
-              <option key={`buy-${token.id}`} value={token.id}>
-                {token.name}
-              </option>
-            ))}
-          </select>
+            data={TOKENS.map((token) => ({
+              value: token.id,
+              label: token.name
+            }))}
+          />
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Swap Amount
-          </label>
-          <input
-            type="text"
+          <TextInput
+            label="Swap Amount"
             value={swapAmount}
-            onChange={handleSwapAmountChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+            onChange={(e) => {
+              setSwapAmount(e.target.value);
+              args.swapAmount = e.target.value;
+            }}
             placeholder="Enter amount to swap"
           />
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Slippage (%)
-          </label>
-          <input
-            type="text"
+          <TextInput
+            label="Slippage (%)"
             value={slippage}
-            onChange={handleSlippageChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+            onChange={(e) => {
+              setSlippage(e.target.value);
+              args.slippage = e.target.value;
+            }}
             placeholder="Enter slippage percentage"
           />
         </div>

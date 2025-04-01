@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { TextInput, Checkbox } from '@mantine/core';
 
 interface TransferNodeProps {
   data: {
@@ -119,13 +120,12 @@ export const TransferNode = ({ data }: TransferNodeProps) => {
         </button>
       </div>
       <div className="absolute left-2 top-2 flex">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={activeState}
           onChange={handleIsActiveChange}
-          className="mr-2"
+          size="xs"
+          label="Active"
         />
-        <label className="text-sm font-medium text-gray-700">Active</label>
       </div>
 
       {isEditingLabel ? (

@@ -87,47 +87,56 @@ export const WorkflowTabs: React.FC<WorkflowTabsProps> = ({
   }, [onAddWorkflow]);
 
   return (
-    <div className="flex items-center overflow-x-auto border-b border-gray-200 bg-gray-100">
+    <div className="bg-charcoal-gray flex items-center overflow-x-auto border-b border-gray-200">
       <div className="flex">
-        {workflows.map((workflow) => (
-          <div
-            key={workflow.id}
-            className={`mr-1 flex h-9 min-w-[120px] max-w-[200px] mt-1 cursor-pointer select-none items-center rounded-t-lg px-3 py-1 ${
-              workflow.id === activeWorkflowId
-                ? "border-x border-b-0 border-t-2 border-gray-200 border-t-blue-500 bg-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-            onClick={() => handleSelectWorkflow(workflow.id)}
-            onDoubleClick={() => handleDoubleClick(workflow)}
-          >
-            {editingTabId === workflow.id ? (
-              <input
-                ref={editInputRef}
-                value={editingName}
-                onChange={handleEditChange}
-                onBlur={handleEditBlur}
-                onKeyDown={handleEditKeyDown}
-                className="w-full bg-transparent outline-none"
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <div className="flex w-full items-center">
-                <span className="flex-1 truncate">{workflow.name}</span>
-                {workflows.length > 1 && (
-                  <button
-                    className="ml-2 text-gray-500 hover:text-gray-800"
-                    onClick={(e) => handleClose(e, workflow.id)}
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
+        {workflows.map((workflow, index) => (
+          <React.Fragment key={workflow.id}>
+            <div
+              className={`mb-1 mr-1 mt-1 flex h-7 min-w-[120px] max-w-[200px] cursor-pointer select-none items-center rounded-md rounded-t-lg px-2 py-0.5 ${
+                index === 0 ? "" : ""
+              } ${
+                workflow.id === activeWorkflowId
+                  ? "bg-soft-black border-b-0 border-gray-200 border-t-white text-white"
+                  : "bg-charcoal-gray hover:bg-soft-black text-white"
+              }`}
+              onClick={() => handleSelectWorkflow(workflow.id)}
+              onDoubleClick={() => handleDoubleClick(workflow)}
+            >
+              {editingTabId === workflow.id ? (
+                <input
+                  ref={editInputRef}
+                  value={editingName}
+                  onChange={handleEditChange}
+                  onBlur={handleEditBlur}
+                  onKeyDown={handleEditKeyDown}
+                  className="w-full bg-transparent outline-none"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <div className="flex w-full items-center justify-center">
+                  <div className="w-4"></div>
+                  <span className="flex-1 truncate text-sm text-center">{workflow.name}</span>
+                  <div className="ml-1 flex w-4 justify-center">
+                    {workflows.length > 1 && workflow.id === activeWorkflowId && (
+                      <button
+                        className="text-gray-500 hover:text-gray-800"
+                        onClick={(e) => handleClose(e, workflow.id)}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            {index < workflows.length - 1 && (
+              <div className="mx-2 flex items-center text-gray-400">|</div>
             )}
-          </div>
+          </React.Fragment>
         ))}
       </div>
       <button
-        className="flex h-9 w-9 items-center justify-center rounded-sm text-gray-600 hover:bg-gray-200"
+        className="flex h-7 w-7 items-center justify-center rounded-sm text-gray-600 hover:bg-gray-200"
         onClick={handleAddWorkflowClick}
       >
         <Plus size={20} />

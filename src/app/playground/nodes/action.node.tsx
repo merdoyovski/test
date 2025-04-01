@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { Select, TextInput, Checkbox } from '@mantine/core';
 
 // Define interfaces for the object structure
 interface AccountOrArg {
@@ -172,13 +173,12 @@ export const ActionNode = ({ data }: ActionNodeProps) => {
         </button>
       </div>
       <div className="absolute left-2 top-2 flex">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={activeState}
           onChange={handleIsActiveChange}
-          className="mr-2"
+          size="xs"
+          label="Active"
         />
-        <label className="text-sm font-medium text-gray-700">Active</label>
       </div>
 
       {isEditingLabel ? (
@@ -209,17 +209,19 @@ export const ActionNode = ({ data }: ActionNodeProps) => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700">Instruction</label>
-        <select
+        <Select
+          label="Instruction"
+          placeholder="Select an instruction"
           value={selected || ""}
-          onChange={handleInstructionChange}
-          className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-        >
-          <option value="" disabled>Select an instruction</option>
-          {instructions.map((instr) => (
-            <option key={instr.name} value={instr.name}>{instr.name}</option>
-          ))}
-        </select>
+          onChange={(value) => {
+            setSelected(value || "");
+            onSelectInstruction(value || "");
+          }}
+          data={instructions.map((instr) => ({
+            value: instr.name,
+            label: instr.name
+          }))}
+        />
       </div>
 
       {currentInstruction && (
@@ -230,14 +232,10 @@ export const ActionNode = ({ data }: ActionNodeProps) => {
             
             return (
               <div key={`account-${name}-${index}`} className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">
-                  {name} {writable ? '(writable)' : '(read-only)'}
-                </label>
-                <input
-                  type="text"
+                <TextInput
+                  label={`${name} ${writable ? '(writable)' : '(read-only)'}`}
                   value={accountInputs[name] || ""}
                   onChange={(e) => onAccountInputChange(name, e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
                   placeholder={`Enter ${name}`}
                   readOnly={!writable}
                 />
@@ -249,12 +247,10 @@ export const ActionNode = ({ data }: ActionNodeProps) => {
             
             return (
               <div key={`arg-${name}-${index}`} className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">{name}</label>
-                <input
-                  type="text"
+                <TextInput
+                  label={name}
                   value={argInputs[name] || ""}
                   onChange={(e) => onArgInputChange(name, e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
                   placeholder={`Enter ${name}`}
                 />
               </div>

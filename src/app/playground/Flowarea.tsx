@@ -1,6 +1,11 @@
 "use client";
 import { useMemo } from "react";
-import ReactFlow, { Controls, Background, Connection } from "reactflow";
+import ReactFlow, {
+  Controls,
+  Background,
+  Connection,
+  MiniMap,
+} from "reactflow";
 import { TransferNode } from "./nodes/transfer.node";
 import { ActionNode } from "./nodes/action.node";
 import { JupiterNode } from "./nodes/jupiter.node";
@@ -32,7 +37,7 @@ export const FlowArea = ({
   const nodeTypes = useMemo(() => nodeTemplates, []);
 
   return (
-    <div className="h-full w-full overflow-hidden">
+    <div className="h-full w-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -40,10 +45,9 @@ export const FlowArea = ({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
-        fitView
-        className="h-full w-full"
       >
         <Background />
+
        
       </ReactFlow>
     </div>
