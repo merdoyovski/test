@@ -40,6 +40,10 @@ import {
   IconX,
   IconChevronLeft,
   IconChevronRight,
+  IconLoader2,
+  IconCircleCheck,
+  IconExternalLink,
+  IconCross,
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -86,6 +90,103 @@ export interface SideBarProps {
   workflowId: string; // Add workflowId prop
 }
 
+// Update the ProgressSteps component with proper typing
+interface ProgressStep {
+  text: string;
+  status: "pending" | "loading" | "complete";
+}
+
+const ProgressSteps = ({
+  steps,
+  signature,
+}: {
+  steps: ProgressStep[];
+  signature?: string;
+}) => {
+  return (
+    <div className="flex h-full w-full" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-col gap-2">
+        {steps.map((step, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <motion.div className="relative flex h-5 w-5 items-center justify-center">
+              <AnimatePresence mode="wait">
+                {step.status === "loading" && (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <IconLoader2
+                      className="animate-spin text-blue-500"
+                      size={16}
+                    />
+                  </motion.div>
+                )}
+                {step.status === "complete" && (
+                  <motion.div
+                    key="complete"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <IconCircleCheck className="text-green-500" size={16} />
+                  </motion.div>
+                )}
+                {step.status === "pending" && (
+                  <motion.div
+                    key="pending"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.3 }}
+                    className="h-4 w-4"
+                  />
+                )}
+              </AnimatePresence>
+            </motion.div>
+            <motion.span
+              animate={{
+                color:
+                  step.status === "loading"
+                    ? "rgb(59, 130, 246)"
+                    : "currentColor",
+                fontWeight: step.status === "loading" ? 500 : 400,
+              }}
+              transition={{ duration: 0.3 }}
+            >
+              {step.text}
+            </motion.span>
+          </div>
+        ))}
+      </div>
+      <div className="ml-auto flex gap-2">
+        <IconExternalLink
+          size={20}
+          stroke={1.5}
+          className="transition-transform hover:scale-110"
+          onClick={() => {
+            if (!signature || signature === "") return;
+            window.open(
+              `https://explorer.solana.com/tx/${signature}?cluster=mainnet`,
+            );
+          }}
+        />
+        <IconX
+          size={20}
+          stroke={1.5}
+          className="transition-transform hover:scale-110"
+          onClick={() => {
+            toast.dismiss();
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
 export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
@@ -99,6 +200,8 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+
+  const latestSignature = useRef("");
   // Create a workflow-specific storage key (memoized to prevent dependency issues)
   const getWorkflowStorageKey = useCallback(() => {
     return `${WORKFLOW_STORAGE_KEY}_${workflowId}`;
@@ -753,9 +856,6 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   };
 
   const handleExecuteWorkflow = async () => {
-    console.log("handleExecuteWorkflow");
-    console.log("nodes: ", nodes);
-
     if (publicKey === null) {
       toast.error("No wallet connected");
       return;
@@ -763,205 +863,274 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
 
     const instructions: any[] = [];
     const extraSigners: Keypair[] = [];
-
     let addressLookupTableAccounts;
 
-    // Show initial toast
+    // Define all steps
+    const steps = [
+      { text: "Creating Transaction", status: "pending" },
+      { text: "Waiting for Signature", status: "pending" },
+      { text: "Transaction Sent", status: "pending" },
+      { text: "Confirming Transaction", status: "pending" },
+    ] as const;
 
-    const toastId = toast.info("Creating the Transaction", {
+    // Update stepsCopy to explicitly match ProgressStep interface
+    const stepsCopy: ProgressStep[] = steps.map((step) => ({
+      text: step.text,
+      status: step.status as "pending" | "loading" | "complete",
+    }));
+
+    // Create initial toast with first step loading
+    if (stepsCopy[0]) {
+      stepsCopy[0].status = "loading";
+    }
+    const toastRender = (
+      <ProgressSteps steps={stepsCopy} signature={latestSignature.current} />
+    );
+    const toastId = toast.info(toastRender, {
       autoClose: false,
+      icon: false, // Remove the info icon
+      closeButton: false,
     });
 
-    for (const node of nodes) {
-      console.log("node.data.isActive:", node.data.isActive);
-      if (!node.data.isActive) continue;
-
-      if (node.type === "meteoraNode") {
-        const {
-          serviceType,
-          poolAddress,
-          totalRangeInterval,
-          strategyType,
-          inputTokenAmount,
-        } = node.data.args;
-
-        switch (serviceType) {
-          case "addLiquidity": {
-            const newBalancePosition = new Keypair();
-            extraSigners.push(newBalancePosition);
-
-            const meteoraIx = await meteoraInitLiquidity(
-              poolAddress,
-              totalRangeInterval,
-              strategyType,
-              inputTokenAmount,
-              newBalancePosition,
-              publicKey,
-              connection,
-            );
-            if (meteoraIx) instructions.push(...meteoraIx.slice(1));
-            break;
-          }
-          case "removeLiquidity": {
-            const meteoraIx = await meteoraRemoveLiquidity(
-              connection,
-              publicKey,
-              poolAddress,
-            );
-            if (meteoraIx) instructions.push(...meteoraIx.slice(1));
-            break;
-          }
-          default:
-            console.log("Unknown Meteora service type:", serviceType);
+    // Update toast helper function
+    const updateSteps = (currentStepIndex: number, error?: boolean) => {
+      if (error) {
+        if (stepsCopy[currentStepIndex]) {
+          stepsCopy[currentStepIndex].status = "pending";
         }
-      } else if (node.type === "transferNode") {
-        const { address, amount } = node.data.args;
-
-        instructions.push(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: new PublicKey(address),
-            lamports: amount,
-          }),
-        );
-      } else if (node.type === "jupiterNode") {
-        const { sellingToken, buyingToken, swapAmount, slippage } =
-          node.data.args;
-
-        const sellingTokenObj = TOKENS.find(
-          (token) => token.id === sellingToken,
-        );
-
-        const buyingTokenObj = TOKENS.find((token) => token.id === buyingToken);
-
-        if (sellingTokenObj && buyingTokenObj && publicKey) {
-          const quote = await GetQuote(
-            sellingTokenObj.address,
-            buyingTokenObj.address,
-            swapAmount,
-            slippage,
-          );
-
-          const swapTx = await BuildSwapTransaction(
-            quote,
-            publicKey.toBase58(),
-          );
-
-          const transactionBase64 = swapTx.swapTransaction;
-
-          const jupTx = VersionedTransaction.deserialize(
-            Buffer.from(transactionBase64, "base64"),
-          );
-
-          addressLookupTableAccounts = await Promise.all(
-            jupTx.message.addressTableLookups.map(async (lookup) => {
-              const lkup = await connection.getAddressLookupTable(
-                lookup.accountKey,
-              );
-
-              return new AddressLookupTableAccount({
-                key: lookup.accountKey,
-                state: AddressLookupTableAccount.deserialize(
-                  await connection
-                    .getAccountInfo(lookup.accountKey)
-                    .then((res) => res!.data),
-                ),
-              });
-            }),
-          );
-
-          const messages = TransactionMessage.decompile(jupTx.message, {
-            addressLookupTableAccounts: addressLookupTableAccounts,
-          });
-
-          instructions.push(...messages.instructions.slice(2));
-        }
+        toast.update(toastId, {
+          type: "error",
+          render: (
+            <ProgressSteps
+              steps={stepsCopy}
+              signature={latestSignature.current}
+            />
+          ),
+          autoClose: 5000,
+          icon: false, // Remove icon
+        });
+        return;
       }
-    }
 
-    if (instructions.length === 0) {
-      toast.error("No instructions to execute");
-      return;
-    }
+      // First mark the current step as complete
+      if (stepsCopy[currentStepIndex]) {
+        stepsCopy[currentStepIndex].status = "complete";
+      }
+
+      toast.update(toastId, {
+        render: (
+          <ProgressSteps
+            steps={stepsCopy}
+            signature={latestSignature.current}
+          />
+        ),
+        icon: false, // Remove icon
+      });
+
+      // Wait at least 1 second before starting the next step
+      if (stepsCopy[currentStepIndex + 1]) {
+        setTimeout(() => {
+          const nextStep = stepsCopy[currentStepIndex + 1];
+          if (nextStep) {
+            nextStep.status = "loading";
+            toast.update(toastId, {
+              render: (
+                <ProgressSteps
+                  steps={stepsCopy}
+                  signature={latestSignature.current}
+                />
+              ),
+              icon: false, // Remove icon
+            });
+          }
+        }, 1000); // Ensure at least 1 second between steps
+      }
+    };
 
     try {
+      // Process nodes
+      for (const node of nodes) {
+        if (!node.data.isActive) continue;
+
+        if (node.type === "meteoraNode") {
+          const {
+            serviceType,
+            poolAddress,
+            totalRangeInterval,
+            strategyType,
+            inputTokenAmount,
+          } = node.data.args;
+
+          switch (serviceType) {
+            case "addLiquidity": {
+              const newBalancePosition = new Keypair();
+              extraSigners.push(newBalancePosition);
+
+              const meteoraIx = await meteoraInitLiquidity(
+                poolAddress,
+                totalRangeInterval,
+                strategyType,
+                inputTokenAmount,
+                newBalancePosition,
+                publicKey,
+                connection,
+              );
+              if (meteoraIx) instructions.push(...meteoraIx.slice(1));
+              break;
+            }
+            case "removeLiquidity": {
+              const meteoraIx = await meteoraRemoveLiquidity(
+                connection,
+                publicKey,
+                poolAddress,
+              );
+              if (meteoraIx) instructions.push(...meteoraIx.slice(1));
+              break;
+            }
+          }
+        } else if (node.type === "transferNode") {
+          const { address, amount } = node.data.args;
+          instructions.push(
+            SystemProgram.transfer({
+              fromPubkey: publicKey,
+              toPubkey: new PublicKey(address),
+              lamports: amount,
+            }),
+          );
+        } else if (node.type === "jupiterNode") {
+          const { sellingToken, buyingToken, swapAmount, slippage } =
+            node.data.args;
+          const sellingTokenObj = TOKENS.find(
+            (token) => token.id === sellingToken,
+          );
+          const buyingTokenObj = TOKENS.find(
+            (token) => token.id === buyingToken,
+          );
+
+          if (sellingTokenObj && buyingTokenObj && publicKey) {
+            const quote = await GetQuote(
+              sellingTokenObj?.address || "", // Add null check with default empty string
+              buyingTokenObj?.address || "", // Add null check with default empty string
+              swapAmount,
+              slippage,
+            );
+
+            if (!quote) {
+              console.error("Failed to get quote");
+              continue;
+            }
+
+            const swapTx = await BuildSwapTransaction(
+              quote,
+              publicKey.toBase58(),
+            );
+            if (!swapTx?.swapTransaction) {
+              console.error("Failed to build swap transaction");
+              continue;
+            }
+
+            const transactionBase64 = swapTx.swapTransaction;
+            const jupTx = VersionedTransaction.deserialize(
+              Buffer.from(transactionBase64, "base64"),
+            );
+
+            addressLookupTableAccounts = await Promise.all(
+              jupTx.message.addressTableLookups.map(async (lookup) => {
+                const lkup = await connection.getAddressLookupTable(
+                  lookup.accountKey,
+                );
+                const accountInfo = await connection.getAccountInfo(
+                  lookup.accountKey,
+                );
+                if (!accountInfo) {
+                  throw new Error(
+                    "Failed to get account info for lookup table",
+                  );
+                }
+                return new AddressLookupTableAccount({
+                  key: lookup.accountKey,
+                  state: AddressLookupTableAccount.deserialize(
+                    accountInfo.data,
+                  ),
+                });
+              }),
+            );
+
+            const messages = TransactionMessage.decompile(jupTx.message, {
+              addressLookupTableAccounts: addressLookupTableAccounts,
+            });
+
+            instructions.push(...messages.instructions.slice(2));
+          }
+        }
+      }
+
+      if (instructions.length === 0) {
+        toast.error("No instructions to execute");
+        return;
+      }
+
+      updateSteps(0); // Complete Creating Transaction, start Waiting for Signature
+
       const { blockhash } = await connection.getLatestBlockhash();
       const deserializedIx = new TransactionMessage({
         payerKey: publicKey,
         instructions: instructions,
         recentBlockhash: blockhash,
       });
+
       const transaction = new VersionedTransaction(
-        deserializedIx.compileToV0Message(addressLookupTableAccounts),
+        deserializedIx.compileToV0Message(addressLookupTableAccounts || []),
       );
 
       for (const signer of extraSigners) {
         transaction.sign([signer]);
       }
 
-      const estimateTx = await connection.simulateTransaction(transaction);
-      console.log("Estimated transaction cost:", estimateTx);
-
-      toast.update(toastId, {
-        render: "Waiting for Signature",
-      });
-      // Send transaction
-      return;
+      // Wait for the previous step animation to complete
+      await new Promise((resolve) => setTimeout(resolve, 1200));
       const signature = await sendTransaction(transaction, connection);
-      console.log("Transaction sent:", signature);
+      latestSignature.current = signature;
 
-      // Update the waiting toast to success
+      // Update the toast with the signature immediately after obtaining it
       toast.update(toastId, {
-        render: "Transaction Sent! Waiting for confirmation",
-        type: "success",
+        render: <ProgressSteps steps={stepsCopy} signature={signature} />,
+        icon: false,
+        closeButton: false,
       });
 
-      // Wait for confirmation
+      updateSteps(1); // Complete Waiting for Signature, start Transaction Sent
+
+      // Wait for animation before starting next step
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      updateSteps(2); // Complete Transaction Sent, start Confirming Transaction
+
       const confirmation = await connection.confirmTransaction(signature);
+
       if (confirmation.value.err) {
-        toast.update(toastId, {
-          render: (
-            <div className="flex items-center gap-2">
-              <span>Transaction Failed!</span>
-              <a
-                href={`https://explorer.solana.com/tx/${signature}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-700"
-              >
-                🔗
-              </a>
-            </div>
-          ),
-          type: "error",
-          autoClose: 5000,
-        });
-      } else {
-        toast.update(toastId, {
-          render: (
-            <div className="flex items-center gap-2">
-              <span>Transaction Confirmed</span>
-              <a
-                href={`https://explorer.solana.com/tx/${signature}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-700"
-              >
-                🔗
-              </a>
-            </div>
-          ),
-          type: "success",
-          autoClose: 5000,
-        });
+        throw new Error("Transaction failed");
       }
+
+      // Wait for the last step animation to complete
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      // All steps complete
+      updateSteps(3);
+
+      // Keep the external link but update auto-close
+      setTimeout(() => {
+        toast.update(toastId, {
+          autoClose: 5000,
+        });
+      }, 1200);
     } catch (error) {
-      console.error("Transaction failed:", error);
-      toast.update(toastId, {
-        render: "Transaction Failed!",
-        type: "error",
-        autoClose: 5000,
-      });
+      console.error("Transaction error:", error);
+      // Find the current loading step and mark it as error
+      const currentLoadingIndex = stepsCopy.findIndex(
+        (step) => step.status === "loading",
+      );
+      if (currentLoadingIndex !== -1) {
+        updateSteps(currentLoadingIndex, true);
+      }
     }
   };
 
@@ -1109,28 +1278,217 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   }, []);
 
   return (
-    <div className="relative flex h-full items-center">
-      <motion.button
+    <div className="relative">
+      <AnimatePresence>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ opacity: 0, x: -224 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -224 }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            className="h-full w-56"
+          >
+            <Paper className="h-full border border-l-0 border-charcoal-gray p-6">
+              <Stack gap="md">
+                {/* File upload section */}
+                <Text fw={600} ta="center" size="lg">
+                  Actions
+                </Text>
+
+                <FileButton
+                  onChange={handleFileUpload}
+                  accept=".json"
+                  multiple={false}
+                >
+                  {(props) => (
+                    <Button
+                      {...props}
+                      variant="light"
+                      leftSection={<IconUpload size={16} />}
+                      fullWidth
+                    >
+                      Anchor IDL
+                    </Button>
+                  )}
+                </FileButton>
+
+                {/* Uploaded files section */}
+                {uploadedFiles.length > 0 && (
+                  <Stack gap="xs">
+                    <Text fw={600} size="lg">
+                      Available Programs ({uploadedFiles.length})
+                    </Text>
+                    <ScrollArea h={240}>
+                      <Stack gap="xs">
+                        {uploadedFiles.map((file, index) => {
+                          const fileName = file.name || `File ${index + 1}`;
+                          const displayName = fileName.includes(".")
+                            ? fileName.split(".")[0]
+                            : fileName;
+
+                          return (
+                            <Paper
+                              key={`${fileName}-${index}`}
+                              p="xs"
+                              withBorder
+                              className="cursor-pointer hover:bg-gray-50"
+                              onClick={() => handleCreateActionNode(file)}
+                            >
+                              <Group justify="space-between">
+                                <div>
+                                  <Text fw={500}>{displayName}</Text>
+                                  <Text size="xs" c="dimmed">
+                                    {file.instructions.length} instructions •
+                                    Added{" "}
+                                    {new Date(file.timestamp).toLocaleString()}
+                                  </Text>
+                                </div>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="red"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (
+                                      confirm(
+                                        `Remove program "${displayName}"?`,
+                                      )
+                                    ) {
+                                      setUploadedFiles((prev) => {
+                                        const updated = prev.filter(
+                                          (_, i) => i !== index,
+                                        );
+                                        localStorage.setItem(
+                                          GLOBAL_PROGRAMS_STORAGE_KEY,
+                                          JSON.stringify(updated),
+                                        );
+                                        return updated;
+                                      });
+                                      setTimeout(
+                                        () => saveWorkflow(false),
+                                        100,
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <IconTrash size={16} />
+                                </ActionIcon>
+                              </Group>
+                            </Paper>
+                          );
+                        })}
+                      </Stack>
+                    </ScrollArea>
+                    <Button
+                      variant="subtle"
+                      color="red"
+                      size="xs"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Clear all ${uploadedFiles.length} programs? This cannot be undone.`,
+                          )
+                        ) {
+                          setUploadedFiles([]);
+                          localStorage.removeItem(GLOBAL_PROGRAMS_STORAGE_KEY);
+                          setTimeout(() => saveWorkflow(false), 100);
+                        }
+                      }}
+                    >
+                      Clear All Programs
+                    </Button>
+                  </Stack>
+                )}
+
+                {/* Action Buttons */}
+                <Button
+                  variant="light"
+                  color="blue"
+                  fullWidth
+                  onClick={() => handleAddTransferNode()}
+                >
+                  SOL Transfer
+                </Button>
+
+                <Button
+                  variant="light"
+                  color="blue"
+                  fullWidth
+                  onClick={() => handleAddJupiterNode()}
+                >
+                  Jupiter Swap
+                </Button>
+
+                <Button
+                  variant="light"
+                  color="blue"
+                  fullWidth
+                  onClick={handleAddMeteoraNode}
+                >
+                  Meteora DLMM
+                </Button>
+
+                {/* <Group gap="xs">
+                  <Button
+                    variant="filled"
+                    color="blue"
+                    fullWidth
+                    onClick={() => saveWorkflow(true)}
+                  >
+                    Save Workflow
+                  </Button>
+                  <Button
+                    variant="light"
+                    color="red"
+                    fullWidth
+                    onClick={clearSavedWorkflow}
+                  >
+                    Clear Saved
+                  </Button>
+                </Group> */}
+
+                <Button
+                  variant="filled"
+                  color="blue"
+                  fullWidth
+                  onClick={() => handleExecuteWorkflow()}
+                >
+                  Execute Workflow
+                </Button>
+
+                <ToastContainer
+                  position="bottom-right"
+                  autoClose={3000}
+                  hideProgressBar={false}
+                  newestOnTop
+                  closeOnClick
+                  rtl={false}
+                  pauseOnFocusLoss
+                  draggable
+                  pauseOnHover
+                  theme="light"
+                />
+              </Stack>
+            </Paper>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default SideBar;
+
+/*
+
+
+    <motion.button
         initial={false}
         animate={{
-          left: isCollapsed ? 0 : "calc(100% - 16px)", // Moves button inside sidebar
-          opacity: isVisible ? 1 : 0, // Toggles visibility
+          x: isCollapsed ? 0 : 0,
         }}
-        transition={{
-          left: { duration: 0.6, ease: "easeInOut" }, // Smooth movement
-          opacity: { duration: 0.1, ease: "linear" }, // Quick fade effect
-        }}
-        onClick={() => {
-          setIsVisible(false); // Fade out instantly
-          setTimeout(() => {
-            setIsCollapsed(!isCollapsed); // Start collapse
-          }, 100); // Short delay before movement
-        }}
-        onAnimationComplete={() => {
-          setTimeout(() => setIsVisible(true), 550); // Fade back in after movement
-        }}
-        className="absolute top-1/2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-50"
-        style={{ transform: "translateY(-50%)" }} // Center vertically
+        transition={{ type: "spring", damping: 20, stiffness: 300 }}
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="border-1 absolute -top-2 right-0 z-10 flex h-6 w-6 translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-50"
       >
         {isCollapsed ? (
           <IconChevronRight size={16} className="text-gray-600" />
@@ -1139,193 +1497,4 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         )}
       </motion.button>
 
-      <motion.div
-        initial={false}
-        animate={{
-          width: isCollapsed ? 0 : 224, // 56px = 14rem
-          opacity: isCollapsed ? 0 : 1,
-        }}
-        transition={{ duration: 0.6, ease: "easeInOut" }}
-        className="h-[calc(100%-2rem)] overflow-hidden"
-      >
-        <Paper className="border-charcoal-gray h-full w-56 border border-l-0 p-6">
-          <Stack gap="md">
-            {/* File upload section */}
-            <Text fw={600} ta="center" size="lg">
-              Actions
-            </Text>
-
-            <FileButton
-              onChange={handleFileUpload}
-              accept=".json"
-              multiple={false}
-            >
-              {(props) => (
-                <Button
-                  {...props}
-                  variant="light"
-                  leftSection={<IconUpload size={16} />}
-                  fullWidth
-                >
-                  Anchor IDL
-                </Button>
-              )}
-            </FileButton>
-
-            {/* Uploaded files section */}
-            {uploadedFiles.length > 0 && (
-              <Stack gap="xs">
-                <Text fw={600} size="lg">
-                  Available Programs ({uploadedFiles.length})
-                </Text>
-                <ScrollArea h={240}>
-                  <Stack gap="xs">
-                    {uploadedFiles.map((file, index) => {
-                      const fileName = file.name || `File ${index + 1}`;
-                      const displayName = fileName.includes(".")
-                        ? fileName.split(".")[0]
-                        : fileName;
-
-                      return (
-                        <Paper
-                          key={`${fileName}-${index}`}
-                          p="xs"
-                          withBorder
-                          className="cursor-pointer hover:bg-gray-50"
-                          onClick={() => handleCreateActionNode(file)}
-                        >
-                          <Group justify="space-between">
-                            <div>
-                              <Text fw={500}>{displayName}</Text>
-                              <Text size="xs" c="dimmed">
-                                {file.instructions.length} instructions • Added{" "}
-                                {new Date(file.timestamp).toLocaleString()}
-                              </Text>
-                            </div>
-                            <ActionIcon
-                              variant="subtle"
-                              color="red"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (
-                                  confirm(`Remove program "${displayName}"?`)
-                                ) {
-                                  setUploadedFiles((prev) => {
-                                    const updated = prev.filter(
-                                      (_, i) => i !== index,
-                                    );
-                                    localStorage.setItem(
-                                      GLOBAL_PROGRAMS_STORAGE_KEY,
-                                      JSON.stringify(updated),
-                                    );
-                                    return updated;
-                                  });
-                                  setTimeout(() => saveWorkflow(false), 100);
-                                }
-                              }}
-                            >
-                              <IconTrash size={16} />
-                            </ActionIcon>
-                          </Group>
-                        </Paper>
-                      );
-                    })}
-                  </Stack>
-                </ScrollArea>
-                <Button
-                  variant="subtle"
-                  color="red"
-                  size="xs"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        `Clear all ${uploadedFiles.length} programs? This cannot be undone.`,
-                      )
-                    ) {
-                      setUploadedFiles([]);
-                      localStorage.removeItem(GLOBAL_PROGRAMS_STORAGE_KEY);
-                      setTimeout(() => saveWorkflow(false), 100);
-                    }
-                  }}
-                >
-                  Clear All Programs
-                </Button>
-              </Stack>
-            )}
-
-            {/* Action Buttons */}
-            <Button
-              variant="light"
-              color="blue"
-              fullWidth
-              onClick={() => handleAddTransferNode()}
-            >
-              SOL Transfer
-            </Button>
-
-            <Button
-              variant="light"
-              color="blue"
-              fullWidth
-              onClick={() => handleAddJupiterNode()}
-            >
-              Jupiter Swap
-            </Button>
-
-            <Button
-              variant="light"
-              color="blue"
-              fullWidth
-              onClick={handleAddMeteoraNode}
-            >
-              Meteora DLMM
-            </Button>
-
-            {/* <Group gap="xs">
-              <Button
-                variant="filled"
-                color="blue"
-                fullWidth
-                onClick={() => saveWorkflow(true)}
-              >
-                Save Workflow
-              </Button>
-              <Button
-                variant="light"
-                color="red"
-                fullWidth
-                onClick={clearSavedWorkflow}
-              >
-                Clear Saved
-              </Button>
-            </Group> */}
-
-            <Button
-              variant="filled"
-              color="blue"
-              fullWidth
-              onClick={() => handleExecuteWorkflow()}
-            >
-              Execute Workflow
-            </Button>
-
-            <ToastContainer
-              position="bottom-right"
-              autoClose={3000}
-              hideProgressBar={false}
-              newestOnTop
-              closeOnClick
-              rtl={false}
-              pauseOnFocusLoss
-              draggable
-              pauseOnHover
-              theme="light"
-            />
-          </Stack>
-        </Paper>
-      </motion.div>
-    </div>
-  );
-};
-
-export default SideBar;
+      */

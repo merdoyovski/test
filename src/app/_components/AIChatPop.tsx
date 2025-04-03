@@ -83,13 +83,13 @@ export default function AIChatPop({ onClose }: AIChatPopProps) {
   };
 
   return (
-    <div className="flex h-[600px] flex-col">
-      <ScrollArea className="flex-1 p-4">
-        <Stack gap="md">
+    <div className="flex h-[calc(500px-64px)] flex-col">
+      <ScrollArea className="flex-1 px-4 py-2">
+        <Stack gap="sm">
           {messages.map((message, index) => (
             <Paper
               key={index}
-              className={`p-3 ${
+              className={`p-2 ${
                 message.role === "user"
                   ? "ml-auto bg-blue-50"
                   : "mr-auto bg-gray-50"
@@ -100,20 +100,17 @@ export default function AIChatPop({ onClose }: AIChatPopProps) {
             </Paper>
           ))}
           {isLoading && (
-            <Paper
-              className="mr-auto bg-gray-50 p-3"
-              style={{ maxWidth: "80%" }}
-            >
+            <Paper className="mr-auto bg-gray-50 p-2" style={{ maxWidth: "80%" }}>
               <Text size="sm">Thinking...</Text>
             </Paper>
           )}
         </Stack>
       </ScrollArea>
 
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-gray-200 p-3">
         <div className="flex gap-2">
           <Textarea
-            placeholder="Ask me to create a node (e.g., 'Create a transfer node to send 1 SOL to address ABC123...' or 'Create a Jupiter swap to swap 10 SOL to USDC')"
+            placeholder="Ask me to create a node..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -124,12 +121,18 @@ export default function AIChatPop({ onClose }: AIChatPopProps) {
             }}
             className="flex-1"
             minRows={1}
-            maxRows={4}
+            maxRows={3}
+            styles={{
+              input: {
+                fontSize: '14px',
+              },
+            }}
           />
           <Button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
             className="self-end"
+            size="sm"
           >
             <IconSend size={16} />
           </Button>
