@@ -1,9 +1,16 @@
 "use client";
-import { useState } from 'react';
+import { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { WorkflowTabs, Workflow } from "./WorkflowTabs";
-import { FlowArea } from "./Flowarea";
-import { Node, Edge, Connection, applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
+import FlowArea from "./Flowarea";
+import {
+  Node,
+  Edge,
+  Connection,
+  applyNodeChanges,
+  applyEdgeChanges,
+  addEdge,
+} from "reactflow";
 
 // Constants
 const WORKFLOWS_KEY = "bflow_workflows";
@@ -17,7 +24,7 @@ interface WorkflowWithFlow extends Workflow {
 export default function Flow() {
   const [userAddress, setUserAddress] = useState("mert");
   const [workflows, setWorkflows] = useState<WorkflowWithFlow[]>(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const saved = localStorage.getItem(WORKFLOWS_KEY);
       return saved ? JSON.parse(saved) : [];
     }
@@ -29,7 +36,7 @@ export default function Flow() {
 
   const handleSelectWorkflow = (id: string) => {
     setActiveWorkflowId(id);
-    const workflow = workflows.find(w => w.id === id);
+    const workflow = workflows.find((w) => w.id === id);
     if (workflow) {
       setNodes(workflow.nodes);
       setEdges(workflow.edges);
@@ -51,13 +58,13 @@ export default function Flow() {
   };
 
   const handleRenameWorkflow = (id: string, newName: string) => {
-    setWorkflows(workflows.map(w => 
-      w.id === id ? { ...w, name: newName } : w
-    ));
+    setWorkflows(
+      workflows.map((w) => (w.id === id ? { ...w, name: newName } : w)),
+    );
   };
 
   const handleCloseWorkflow = (id: string) => {
-    setWorkflows(workflows.filter(w => w.id !== id));
+    setWorkflows(workflows.filter((w) => w.id !== id));
     if (activeWorkflowId === id) {
       setActiveWorkflowId("");
       setNodes([]);
@@ -98,4 +105,4 @@ export default function Flow() {
       </div>
     </div>
   );
-} 
+}
