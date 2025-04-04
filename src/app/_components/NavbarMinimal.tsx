@@ -313,6 +313,27 @@ export function NavbarMinimal() {
     }
   };
 
+  const handleTest = async () => {
+    const test = {
+      name: "string",
+      actions: [
+        {
+          type: 4,
+          name: "merod",
+          node: '{"id":"meteora-1","type":"meteoraNode","position":{"x":405.5291798875149,"y":106.95478641141148},"data":{"label":"Meteora LP (6)","isActive":false,"args":{"poolAddress":"5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6","totalRangeInterval":"10","strategyType":"0","inputTokenAmount":"100","serviceType":"addLiquidity"},"groupId":1,"orderId":1},"width":268,"height":564,"selected":false,"positionAbsolute":{"x":405.5291798875149,"y":106.95478641141148},"dragging":false}',
+        },
+      ],
+    };
+    await fetch("https://localhost:7023/workflow?userAddress=merdo", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(test),
+    });
+    alert(500);
+  };
+
   const currentConfig = getPageConfig(pathname);
 
   const links = mockdata.map((link) => (
@@ -339,7 +360,13 @@ export function NavbarMinimal() {
       </div>
       <nav className="flex w-20 flex-col bg-white p-4 pt-0">
         <div className="mt-1 flex flex-1 flex-col gap-4">
-          <Text fw={700} size="lg" ta="center" className="mb-4">
+          <Text
+            fw={700}
+            size="lg"
+            ta="center"
+            className="mb-4"
+            onClick={handleTest}
+          >
             bFlow
           </Text>
           <Stack gap="md" justify="center">
@@ -350,14 +377,6 @@ export function NavbarMinimal() {
         <Stack gap="md" justify="center">
           <BalanceDisplay />
           <WalletDropdown />
-
-          <NavbarLink
-            icon={IconLogout}
-            label="Logout"
-            href="/logout"
-            active={pathname === "/logout"}
-            onClick={() => setActive("/logout")}
-          />
         </Stack>
       </nav>
     </div>
