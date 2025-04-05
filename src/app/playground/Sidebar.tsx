@@ -15,7 +15,7 @@ import {
 } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { BuildSwapTransaction, GetQuote } from "../_services/jupiter";
-import { TOKENS } from "../_constants/tokens";
+import { TOKENS } from "../_constants/solana.tokens";
 
 import {
   meteoraInitLiquidity,

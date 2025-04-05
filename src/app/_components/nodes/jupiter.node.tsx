@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { TOKENS } from "../../_constants/tokens";
-import { Select, TextInput, Checkbox } from '@mantine/core';
+import { TOKENS } from "../../_constants/solana.tokens";
+import { Select, TextInput, Checkbox } from "@mantine/core";
 
 interface JupiterNodeProps {
   data: {
@@ -22,11 +22,24 @@ interface JupiterNodeProps {
 }
 
 export const JupiterNode = ({ data }: JupiterNodeProps) => {
-  const { label, args, onRemove, isActive, setActive, groupId, orderId, updateLabel } = data;
+  const {
+    label,
+    args,
+    onRemove,
+    isActive,
+    setActive,
+    groupId,
+    orderId,
+    updateLabel,
+  } = data;
 
   // Use the first token's id as default if not provided
-  const [sellingToken, setSellingToken] = useState<string>(args.sellingToken || TOKENS[0]?.id || "SOL");
-  const [buyingToken, setBuyingToken] = useState<string>(args.buyingToken || TOKENS[0]?.id || "USDC");
+  const [sellingToken, setSellingToken] = useState<string>(
+    args.sellingToken || TOKENS[0]?.id || "SOL",
+  );
+  const [buyingToken, setBuyingToken] = useState<string>(
+    args.buyingToken || TOKENS[0]?.id || "USDC",
+  );
   const [swapAmount, setSwapAmount] = useState(args.swapAmount || "");
   const [slippage, setSlippage] = useState(args.slippage || "");
   const [activeState, setActiveState] = useState(isActive);
@@ -37,7 +50,7 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
   useEffect(() => {
     setActiveState(isActive);
   }, [isActive]);
-  
+
   // Sync args with local state
   useEffect(() => {
     args.sellingToken = sellingToken;
@@ -66,14 +79,14 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
     console.log("JupiterNode handleIsActiveChange:");
     console.log("- Current local activeState:", activeState);
     console.log("- Current props isActive:", isActive);
-    
+
     // Update local state first for immediate UI feedback
     setActiveState(!activeState);
-    
+
     // Call parent component's setActive function to update node data
     console.log("- Calling setActive function...");
     setActive();
-    
+
     // Log the expected new state
     console.log("- Expected new activeState:", !activeState);
   };
@@ -93,16 +106,16 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
   };
 
   const handleLabelSave = () => {
-    if (updateLabel && labelValue.trim() !== '') {
+    if (updateLabel && labelValue.trim() !== "") {
       updateLabel(labelValue);
     }
     setIsEditingLabel(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleLabelSave();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       // Reset to original label and exit edit mode
       setLabelValue(label);
       setIsEditingLabel(false);
@@ -156,7 +169,7 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
       ) : (
         <h3 className="mb-4 mt-4 font-bold">{label}</h3>
       )}
-      
+
       <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
         <span>Group: {groupId}</span>
         <span>Order: {orderId}</span>
@@ -173,7 +186,7 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
             }}
             data={TOKENS.map((token) => ({
               value: token.id,
-              label: token.name
+              label: token.name,
             }))}
           />
         </div>
@@ -188,7 +201,7 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
             }}
             data={TOKENS.map((token) => ({
               value: token.id,
-              label: token.name
+              label: token.name,
             }))}
           />
         </div>
@@ -219,4 +232,4 @@ export const JupiterNode = ({ data }: JupiterNodeProps) => {
       </div>
     </div>
   );
-}; 
+};

@@ -13,7 +13,7 @@ import {
   meteoraRemoveLiquidity,
 } from "../../_services/meteora"; // Assuming these functions exist
 import { AddressLookupTableAccount } from "@solana/web3.js";
-import { TOKENS } from "../../_constants/tokens"; // Assuming this exists
+import { TOKENS } from "../../_constants/solana.tokens"; // Assuming this exists
 
 // Keep the existing GET endpoint
 export async function GET() {

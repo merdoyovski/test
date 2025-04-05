@@ -6,10 +6,10 @@ import ReactFlow, {
   Connection,
   MiniMap,
 } from "reactflow";
-import { TransferNode } from "./nodes/transfer.node";
-import { ActionNode } from "./nodes/action.node";
-import { JupiterNode } from "./nodes/jupiter.node";
-import { MeteoraNode } from "./nodes/meteora.node";
+import { TransferNode } from "../_components/nodes/transfer.node";
+import { ActionNode } from "../_components/nodes/action.node";
+import { JupiterNode } from "../_components/nodes/jupiter.node";
+import { MeteoraNode } from "../_components/nodes/meteora.node";
 import "reactflow/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { IconRobot, IconX } from "@tabler/icons-react";
@@ -30,7 +30,13 @@ export interface FlowAreaProps {
   onConnect: (params: Connection) => void;
 }
 
-export default function FlowArea({ nodes, edges, onNodesChange, onEdgesChange, onConnect }: FlowAreaProps) {
+export default function FlowArea({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+}: FlowAreaProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   const nodeTypes = useMemo(() => nodeTemplates, []);
