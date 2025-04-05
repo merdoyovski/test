@@ -861,10 +861,6 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
       return;
     }
 
-    const instructions: any[] = [];
-    const extraSigners: Keypair[] = [];
-    let addressLookupTableAccounts;
-
     // Define all steps
     const steps = [
       { text: "Creating Transaction", status: "pending" },
@@ -948,143 +944,48 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     };
 
     try {
-      // Process nodes
-      for (const node of nodes) {
-        if (!node.data.isActive) continue;
+      // Call the transaction API endpoint to process nodes and create the transaction
+      const response = await fetch("/api/transaction", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nodes,
+          publicKey: publicKey.toBase58(),
+        }),
+      });
 
-        if (node.type === "meteoraNode") {
-          const {
-            serviceType,
-            poolAddress,
-            totalRangeInterval,
-            strategyType,
-            inputTokenAmount,
-          } = node.data.args;
-
-          switch (serviceType) {
-            case "addLiquidity": {
-              const newBalancePosition = new Keypair();
-              extraSigners.push(newBalancePosition);
-
-              const meteoraIx = await meteoraInitLiquidity(
-                poolAddress,
-                totalRangeInterval,
-                strategyType,
-                inputTokenAmount,
-                newBalancePosition,
-                publicKey,
-                connection,
-              );
-              if (meteoraIx) instructions.push(...meteoraIx.slice(1));
-              break;
-            }
-            case "removeLiquidity": {
-              const meteoraIx = await meteoraRemoveLiquidity(
-                connection,
-                publicKey,
-                poolAddress,
-              );
-              if (meteoraIx) instructions.push(...meteoraIx.slice(1));
-              break;
-            }
-          }
-        } else if (node.type === "transferNode") {
-          const { address, amount } = node.data.args;
-          instructions.push(
-            SystemProgram.transfer({
-              fromPubkey: publicKey,
-              toPubkey: new PublicKey(address),
-              lamports: amount,
-            }),
-          );
-        } else if (node.type === "jupiterNode") {
-          const { sellingToken, buyingToken, swapAmount, slippage } =
-            node.data.args;
-          const sellingTokenObj = TOKENS.find(
-            (token) => token.id === sellingToken,
-          );
-          const buyingTokenObj = TOKENS.find(
-            (token) => token.id === buyingToken,
-          );
-
-          if (sellingTokenObj && buyingTokenObj && publicKey) {
-            const quote = await GetQuote(
-              sellingTokenObj?.address || "", // Add null check with default empty string
-              buyingTokenObj?.address || "", // Add null check with default empty string
-              swapAmount,
-              slippage,
-            );
-
-            if (!quote) {
-              console.error("Failed to get quote");
-              continue;
-            }
-
-            const swapTx = await BuildSwapTransaction(
-              quote,
-              publicKey.toBase58(),
-            );
-            if (!swapTx?.swapTransaction) {
-              console.error("Failed to build swap transaction");
-              continue;
-            }
-
-            const transactionBase64 = swapTx.swapTransaction;
-            const jupTx = VersionedTransaction.deserialize(
-              Buffer.from(transactionBase64, "base64"),
-            );
-
-            addressLookupTableAccounts = await Promise.all(
-              jupTx.message.addressTableLookups.map(async (lookup) => {
-                const lkup = await connection.getAddressLookupTable(
-                  lookup.accountKey,
-                );
-                const accountInfo = await connection.getAccountInfo(
-                  lookup.accountKey,
-                );
-                if (!accountInfo) {
-                  throw new Error(
-                    "Failed to get account info for lookup table",
-                  );
-                }
-                return new AddressLookupTableAccount({
-                  key: lookup.accountKey,
-                  state: AddressLookupTableAccount.deserialize(
-                    accountInfo.data,
-                  ),
-                });
-              }),
-            );
-
-            const messages = TransactionMessage.decompile(jupTx.message, {
-              addressLookupTableAccounts: addressLookupTableAccounts,
-            });
-
-            instructions.push(...messages.instructions.slice(2));
-          }
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to process transaction");
       }
 
-      if (instructions.length === 0) {
-        toast.error("No instructions to execute");
-        return;
+      const {
+        transaction: transactionBase64,
+        extraSigners,
+        blockhash,
+      } = await response.json();
+
+      if (!transactionBase64) {
+        throw new Error("No transaction returned from server");
       }
 
       updateSteps(0); // Complete Creating Transaction, start Waiting for Signature
 
-      const { blockhash } = await connection.getLatestBlockhash();
-      const deserializedIx = new TransactionMessage({
-        payerKey: publicKey,
-        instructions: instructions,
-        recentBlockhash: blockhash,
-      });
-
-      const transaction = new VersionedTransaction(
-        deserializedIx.compileToV0Message(addressLookupTableAccounts || []),
+      // Deserialize the transaction
+      const transaction = VersionedTransaction.deserialize(
+        Buffer.from(transactionBase64, "base64"),
       );
 
-      for (const signer of extraSigners) {
-        transaction.sign([signer]);
+      // Convert extraSigners from JSON and sign the transaction
+      if (extraSigners && extraSigners.length > 0) {
+        for (const signerData of extraSigners) {
+          const signer = Keypair.fromSecretKey(
+            new Uint8Array(signerData.secretKey),
+          );
+          transaction.sign([signer]);
+        }
       }
 
       // Wait for the previous step animation to complete
