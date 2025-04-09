@@ -1,26 +1,10 @@
 // SideBar.tsx
 "use client";
-import React, { useRef, useState, useEffect, useCallback } from "react";
-import type { Dispatch, SetStateAction } from "react";
-import type { Node } from "reactflow";
-import { DndProvider, useDrag, useDrop } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
-import {
-  AddressLookupTableAccount,
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  TransactionMessage,
-  VersionedTransaction,
-} from "@solana/web3.js";
+import React, { useRef, useState, useEffect } from "react";
+import type { Node, Edge } from "reactflow";
+import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { BuildSwapTransaction, GetQuote } from "../_services/jupiter";
 import { TOKENS } from "../_constants/solana.tokens";
-
-import {
-  meteoraInitLiquidity,
-  meteoraRemoveLiquidity,
-} from "../_services/meteora";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -32,31 +16,19 @@ import {
   Paper,
   ScrollArea,
   ActionIcon,
-  rem,
 } from "@mantine/core";
-import {
-  IconUpload,
-  IconTrash,
-  IconX,
-  IconChevronLeft,
-  IconChevronRight,
-  IconLoader2,
-  IconCircleCheck,
-  IconExternalLink,
-  IconCross,
-} from "@tabler/icons-react";
+import { IconUpload, IconTrash } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-// Define the localStorage key for saving workflow
-const WORKFLOW_STORAGE_KEY = "bflow-workflow-data";
-// Add a new storage key for global programs
-const GLOBAL_PROGRAMS_STORAGE_KEY = "bflow-global-programs";
+import { saveWorkflow } from "../api/workflowApi";
+import { actionTypeMap, EnumActionType } from "../_constants/node.types";
+import { ProgressStep, ProgressSteps } from "../_components/Progress";
+import { emptyGuid } from "../_constants/constants";
 
 // Define interface for uploaded IDL files
 interface UploadedFile {
-  name: string; // Name is required and must be a string
+  name: string;
   instructions: any[];
-  timestamp: number; // For sorting/display purposes
+  timestamp: number;
 }
 
 // Define interface for the node in sidebar (for ordering)
@@ -66,146 +38,34 @@ interface SidebarNodeItem {
   name: string;
   groupId: number;
   orderId: number;
-  fileData?: UploadedFile; // Only for action nodes
-  isActive: boolean; // Add isActive property to track active state in sidebar
+  fileData?: UploadedFile;
+  isActive: boolean;
 }
 
-// Define interface for saved workflow data
-interface WorkflowData {
-  nodes: Node<any, string | undefined>[];
-  sidebarNodes: SidebarNodeItem[];
-  uploadedFiles: UploadedFile[];
-  lastSaved: number; // Timestamp for when it was saved
-}
-
-// Type for flow nodes to ensure we handle orderId correctly
-type FlowNodeData = {
-  orderId: number;
-  [key: string]: any;
-};
-
-export interface SideBarProps {
-  nodes: Node<any, string | undefined>[];
-  setNodes: Dispatch<SetStateAction<Node<any, string | undefined>[]>>;
-  workflowId: string; // Add workflowId prop
+interface SideBarProps {
+  setNodes: (nodes: Node[]) => void;
+  nodes: Node[];
+  workflowId: string;
+  workflowName: string;
 }
 
 // Update the ProgressSteps component with proper typing
-interface ProgressStep {
-  text: string;
-  status: "pending" | "loading" | "complete";
-}
 
-const ProgressSteps = ({
-  steps,
-  signature,
-}: {
-  steps: ProgressStep[];
-  signature?: string;
-}) => {
-  return (
-    <div className="flex h-full w-full" onClick={(e) => e.stopPropagation()}>
-      <div className="flex flex-col gap-2">
-        {steps.map((step, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <motion.div className="relative flex h-5 w-5 items-center justify-center">
-              <AnimatePresence mode="wait">
-                {step.status === "loading" && (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <IconLoader2
-                      className="animate-spin text-blue-500"
-                      size={16}
-                    />
-                  </motion.div>
-                )}
-                {step.status === "complete" && (
-                  <motion.div
-                    key="complete"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <IconCircleCheck className="text-green-500" size={16} />
-                  </motion.div>
-                )}
-                {step.status === "pending" && (
-                  <motion.div
-                    key="pending"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.3 }}
-                    className="h-4 w-4"
-                  />
-                )}
-              </AnimatePresence>
-            </motion.div>
-            <motion.span
-              animate={{
-                color:
-                  step.status === "loading"
-                    ? "rgb(59, 130, 246)"
-                    : "currentColor",
-                fontWeight: step.status === "loading" ? 500 : 400,
-              }}
-              transition={{ duration: 0.3 }}
-            >
-              {step.text}
-            </motion.span>
-          </div>
-        ))}
-      </div>
-      <div className="ml-auto flex gap-2">
-        <IconExternalLink
-          size={20}
-          stroke={1.5}
-          className="transition-transform hover:scale-110"
-          onClick={() => {
-            if (!signature || signature === "") return;
-            window.open(
-              `https://explorer.solana.com/tx/${signature}?cluster=mainnet`,
-            );
-          }}
-        />
-        <IconX
-          size={20}
-          stroke={1.5}
-          className="transition-transform hover:scale-110"
-          onClick={() => {
-            toast.dismiss();
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
-export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
+export const SideBar = ({
+  setNodes,
+  nodes,
+  workflowId,
+  workflowName,
+}: SideBarProps) => {
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
-  const [userAddress, setUserAddress] = useState("mert");
   const fileCounter = useRef(1);
-  // State to store uploaded files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  // State to track node order
   const [sidebarNodes, setSidebarNodes] = useState<SidebarNodeItem[]>([]);
-  // State to track if we've loaded from localStorage
+
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
 
   const latestSignature = useRef("");
-  // Create a workflow-specific storage key (memoized to prevent dependency issues)
-  const getWorkflowStorageKey = useCallback(() => {
-    return `${WORKFLOW_STORAGE_KEY}_${workflowId}`;
-  }, [workflowId]);
 
   // Reset loading state when workflowId changes
   useEffect(() => {
@@ -225,41 +85,11 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
   }, [workflowId]);
 
   // Utility function to toggle a node's active state
-  const toggleNodeActive = (nodeId: string) => {
-    // Update flow nodes
-    setNodes((prevNodes) =>
-      prevNodes.map((node) => {
-        if (node.id === nodeId) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              isActive: !node.data.isActive,
-            },
-          };
-        }
-        return node;
-      }),
-    );
-
-    // Update sidebar nodes
-    setSidebarNodes((prevSidebarNodes) =>
-      prevSidebarNodes.map((sidebarNode) => {
-        if (sidebarNode.id === nodeId) {
-          return { ...sidebarNode, isActive: !sidebarNode.isActive };
-        }
-        return sidebarNode;
-      }),
-    );
-  };
 
   // Utility function to remove a node
   const removeNode = (nodeId: string) => {
-    // Remove from flow nodes
-    setNodes((prevNodes) => prevNodes.filter((node) => node.id !== nodeId));
-    // Remove from sidebar nodes
-    setSidebarNodes((prevSidebarNodes) =>
-      prevSidebarNodes.filter((node) => node.id !== nodeId),
+    setNodes((prevNodes: Node[]) =>
+      prevNodes.filter((node: Node) => node.id !== nodeId),
     );
 
     // Reorder nodes after a short delay
@@ -300,215 +130,6 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
         });
       });
     }, 10);
-  };
-
-  // Utility function to update a node's label
-  const updateNodeLabel = (nodeId: string, newLabel: string) => {
-    // Update in flow nodes
-    setNodes((prevNodes) =>
-      prevNodes.map((node) => {
-        if (node.id === nodeId) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              label: newLabel,
-            },
-          };
-        }
-        return node;
-      }),
-    );
-
-    // Update in sidebar nodes
-    setSidebarNodes((prevSidebarNodes) =>
-      prevSidebarNodes.map((sidebarNode) => {
-        if (sidebarNode.id === nodeId) {
-          return { ...sidebarNode, name: newLabel };
-        }
-        return sidebarNode;
-      }),
-    );
-  };
-
-  // Effect to load data from localStorage on first mount
-  useEffect(() => {
-    if (hasLoadedFromStorage || !workflowId) return;
-
-    try {
-      const storageKey = getWorkflowStorageKey();
-      const savedData = localStorage.getItem(storageKey);
-
-      // Load global programs
-      const savedPrograms = localStorage.getItem(GLOBAL_PROGRAMS_STORAGE_KEY);
-
-      // Set uploaded files from global storage if available
-      if (savedPrograms) {
-        const parsedPrograms = JSON.parse(savedPrograms) as UploadedFile[];
-        setUploadedFiles(parsedPrograms || []);
-      }
-
-      if (savedData) {
-        const parsedData = JSON.parse(savedData) as WorkflowData;
-
-        // Set the sidebar nodes from storage
-        setSidebarNodes(parsedData.sidebarNodes || []);
-
-        // Reattach function references to the nodes before setting them
-        const restoredNodes = parsedData.nodes.map((node) => {
-          // Make a copy of the node
-          const nodeWithFunctions = { ...node };
-
-          // Reattach functions based on node type
-          if (node.type === "actionNode") {
-            // For action nodes, we need to reattach these functions
-            nodeWithFunctions.data = {
-              ...node.data,
-              onSelectInstruction: (instructionName: string) => {
-                // Update the node with the selected instruction
-                setNodes((prevNodes) =>
-                  prevNodes.map((n) => {
-                    if (n.id === node.id) {
-                      return {
-                        ...n,
-                        data: {
-                          ...n.data,
-                          selectedInstruction: instructionName,
-                          accountInputs: {},
-                          argInputs: {},
-                        },
-                      };
-                    }
-                    return n;
-                  }),
-                );
-              },
-              onAccountInputChange: (key: string, value: string) => {
-                setNodes((prevNodes) =>
-                  prevNodes.map((n) => {
-                    if (n.id === node.id) {
-                      return {
-                        ...n,
-                        data: {
-                          ...n.data,
-                          accountInputs: {
-                            ...n.data.accountInputs,
-                            [key]: value,
-                          },
-                        },
-                      };
-                    }
-                    return n;
-                  }),
-                );
-              },
-              onArgInputChange: (key: string, value: string) => {
-                setNodes((prevNodes) =>
-                  prevNodes.map((n) => {
-                    if (n.id === node.id) {
-                      return {
-                        ...n,
-                        data: {
-                          ...n.data,
-                          argInputs: {
-                            ...n.data.argInputs,
-                            [key]: value,
-                          },
-                        },
-                      };
-                    }
-                    return n;
-                  }),
-                );
-              },
-              setActive: () => toggleNodeActive(node.id),
-              onRemove: () => removeNode(node.id),
-              updateLabel: (newLabel: string) =>
-                updateNodeLabel(node.id, newLabel),
-            };
-          } else if (node.type === "transferNode") {
-            // For transfer nodes, reattach these functions
-            nodeWithFunctions.data = {
-              ...node.data,
-              setActive: () => toggleNodeActive(node.id),
-              onRemove: () => removeNode(node.id),
-              updateLabel: (newLabel: string) =>
-                updateNodeLabel(node.id, newLabel),
-            };
-          }
-
-          return nodeWithFunctions;
-        });
-
-        // Set the flow nodes with reattached functions
-        setNodes(restoredNodes);
-
-        // Update the fileCounter to be higher than any existing counter
-        const highestCounter = Math.max(
-          0,
-          ...parsedData.nodes.map((node) => {
-            const match = node.data?.label?.match?.(/\((\d+)\)$/);
-            return match ? parseInt(match[1]) : 0;
-          }),
-        );
-        fileCounter.current = highestCounter + 1;
-
-        console.log(
-          "Successfully loaded workflow data with reattached functions",
-        );
-      }
-    } catch (error) {
-      console.error("Error loading data from localStorage:", error);
-    }
-
-    setHasLoadedFromStorage(true);
-  }, [setNodes, hasLoadedFromStorage, workflowId, getWorkflowStorageKey]);
-
-  // Modify saveWorkflow function to save global programs separately
-  const saveWorkflow = useCallback(
-    (notifyUser = true) => {
-      if (!workflowId) return;
-
-      try {
-        // Save workflow-specific data
-        const workflowData: WorkflowData = {
-          nodes,
-          sidebarNodes,
-          uploadedFiles: [], // Don't store files with workflow anymore
-          lastSaved: Date.now(),
-        };
-
-        const storageKey = getWorkflowStorageKey();
-        localStorage.setItem(storageKey, JSON.stringify(workflowData));
-
-        // Save global programs separately
-        //localStorage.setItem(GLOBAL_PROGRAMS_STORAGE_KEY, JSON.stringify(uploadedFiles));
-
-        if (notifyUser) {
-          alert(
-            `Workflow saved successfully!\n- ${nodes.length} nodes\n- ${uploadedFiles.length} programs`,
-          );
-        }
-      } catch (error) {
-        console.error("Error saving workflow:", error);
-        alert("Failed to save workflow.");
-      }
-    },
-    [nodes, sidebarNodes, uploadedFiles, workflowId, getWorkflowStorageKey],
-  );
-
-  // Clear saved workflow data
-  const clearSavedWorkflow = () => {
-    if (
-      confirm(
-        "Are you sure you want to clear all saved workflow data? This cannot be undone.",
-      )
-    ) {
-      const storageKey = getWorkflowStorageKey();
-      localStorage.removeItem(storageKey);
-      console.log("Workflow data cleared from localStorage");
-      alert("Saved workflow data has been cleared.");
-    }
   };
 
   // Effect to update flow nodes when sidebarNodes change
@@ -603,60 +224,9 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     return highestOrderId + 1;
   };
 
-  // Updated toggleNodeActiveState function
-  const toggleNodeActiveState = (nodeId: string) => {
-    toggleNodeActive(nodeId);
-  };
-
-  // Updated reorderNodes to reuse the logic in removeNode
-  const reorderNodes = (forceReorder = false) => {
-    // Sort current nodes
-    const sortedNodes = [...sidebarNodes].sort((a, b) => a.orderId - b.orderId);
-
-    // Check if reordering is needed
-    const needsReordering =
-      forceReorder ||
-      sortedNodes.some((node, index) => node.orderId !== index + 1);
-
-    if (!needsReordering) {
-      console.log("Nodes already properly ordered, skipping reorder");
-      return;
-    }
-
-    // Reassign order IDs
-    const reorderedNodes = sortedNodes.map((node, index) => ({
-      ...node,
-      orderId: index + 1,
-    }));
-
-    // Update sidebar nodes
-    setSidebarNodes(reorderedNodes);
-
-    // Update flow nodes in the next tick
-    setTimeout(() => {
-      setNodes((prevFlowNodes) => {
-        return prevFlowNodes.map((flowNode) => {
-          const matchingSidebarNode = reorderedNodes.find(
-            (sn) => sn.id === flowNode.id,
-          );
-          if (matchingSidebarNode) {
-            return {
-              ...flowNode,
-              data: {
-                ...flowNode.data,
-                orderId: matchingSidebarNode.orderId,
-              },
-            };
-          }
-          return flowNode;
-        });
-      });
-    }, 10);
-  };
-
   const handleAddTransferNode = (address: string = "", amount: string = "") => {
     const orderId = getNextOrderId();
-    const newNodeId = `transfer-${orderId}`;
+    const newNodeId = "tbdOnServer";
     const groupId = 1; // Default group
     const initialIsActive = true; // Set initial active state
 
@@ -712,7 +282,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
 
           // Create a new uploaded file entry
           const newFile: UploadedFile = {
-            name: file.name || `File-${Date.now()}`, // Ensure name is always a string
+            name: file.name || `File-${Date.now()}`,
             instructions,
             timestamp: Date.now(),
           };
@@ -730,15 +300,6 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
             console.log(
               `Added program "${newFile.name}" with ${instructions.length} instructions`,
             );
-
-            // Save to global storage immediately within the state update callback
-            localStorage.setItem(
-              GLOBAL_PROGRAMS_STORAGE_KEY,
-              JSON.stringify(updatedFiles),
-            );
-            console.log("Saved to global storage");
-            const test = localStorage.getItem(GLOBAL_PROGRAMS_STORAGE_KEY);
-            console.log("Test:", test);
 
             return updatedFiles;
           });
@@ -1050,7 +611,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     console.log("slippage:", slippage);
 
     const orderId = getNextOrderId();
-    const newNodeId = `jupiter-${orderId}`;
+    const newNodeId = "tbdOnServer";
     const groupId = 1; // Default group
     const initialIsActive = true; // Set initial active state
 
@@ -1094,7 +655,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
       },
     };
 
-    setNodes((prevNodes) => [...prevNodes, jupiterNode]);
+    setNodes((prevNodes: any) => [...prevNodes, jupiterNode]);
   };
 
   // Add handleAddMeteoraNode function
@@ -1102,7 +663,7 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     const newCounter = nodes.length + 1;
 
     const orderId = getNextOrderId();
-    const newNodeId = `meteora-${orderId}`;
+    const newNodeId = "tbdOnServer";
     const groupId = 1; // Default group
     const initialIsActive = true; // Set initial active state
 
@@ -1178,200 +739,198 @@ export const SideBar = ({ setNodes, nodes, workflowId }: SideBarProps) => {
     };
   }, []);
 
+  const handleSaveWorkflow = async () => {
+    console.log("nodes for post: ", nodes);
+
+    try {
+      const workflowData = {
+        ID: workflowId === "tbdOnServer" ? emptyGuid : workflowId,
+        Name: workflowName,
+        Actions: nodes.map((node) => ({
+          Type: actionTypeMap[node.type!] ?? EnumActionType.NONE,
+          Name: node.data?.label,
+          Node: JSON.stringify(node),
+        })),
+      };
+
+      await saveWorkflow(workflowData);
+      toast.success("Workflow saved successfully!");
+    } catch (error) {
+      console.error("Error saving workflow:", error);
+      toast.error("Failed to save workflow");
+    }
+  };
+
   return (
     <div className="relative">
       <AnimatePresence>
-        {!isCollapsed && (
-          <motion.div
-            initial={{ opacity: 0, x: -224 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -224 }}
-            transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="h-full w-56"
-          >
-            <Paper className="h-full border border-l-0 border-charcoal-gray p-6">
-              <Stack gap="md">
-                {/* File upload section */}
-                <Text fw={600} ta="center" size="lg">
-                  Actions
-                </Text>
+        <motion.div
+          initial={{ opacity: 0, x: -224 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -224 }}
+          transition={{ type: "spring", damping: 20, stiffness: 300 }}
+          className="h-full w-56"
+        >
+          <Paper className="h-full border border-l-0 border-charcoal-gray p-6">
+            <Stack gap="md">
+              {/* File upload section */}
+              <Text fw={600} ta="center" size="lg">
+                Actions
+              </Text>
 
-                <FileButton
-                  onChange={handleFileUpload}
-                  accept=".json"
-                  multiple={false}
-                >
-                  {(props) => (
-                    <Button
-                      {...props}
-                      variant="light"
-                      leftSection={<IconUpload size={16} />}
-                      fullWidth
-                    >
-                      Anchor IDL
-                    </Button>
-                  )}
-                </FileButton>
-
-                {/* Uploaded files section */}
-                {uploadedFiles.length > 0 && (
-                  <Stack gap="xs">
-                    <Text fw={600} size="lg">
-                      Available Programs ({uploadedFiles.length})
-                    </Text>
-                    <ScrollArea h={240}>
-                      <Stack gap="xs">
-                        {uploadedFiles.map((file, index) => {
-                          const fileName = file.name || `File ${index + 1}`;
-                          const displayName = fileName.includes(".")
-                            ? fileName.split(".")[0]
-                            : fileName;
-
-                          return (
-                            <Paper
-                              key={`${fileName}-${index}`}
-                              p="xs"
-                              withBorder
-                              className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => handleCreateActionNode(file)}
-                            >
-                              <Group justify="space-between">
-                                <div>
-                                  <Text fw={500}>{displayName}</Text>
-                                  <Text size="xs" c="dimmed">
-                                    {file.instructions.length} instructions •
-                                    Added{" "}
-                                    {new Date(file.timestamp).toLocaleString()}
-                                  </Text>
-                                </div>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (
-                                      confirm(
-                                        `Remove program "${displayName}"?`,
-                                      )
-                                    ) {
-                                      setUploadedFiles((prev) => {
-                                        const updated = prev.filter(
-                                          (_, i) => i !== index,
-                                        );
-                                        localStorage.setItem(
-                                          GLOBAL_PROGRAMS_STORAGE_KEY,
-                                          JSON.stringify(updated),
-                                        );
-                                        return updated;
-                                      });
-                                      setTimeout(
-                                        () => saveWorkflow(false),
-                                        100,
-                                      );
-                                    }
-                                  }}
-                                >
-                                  <IconTrash size={16} />
-                                </ActionIcon>
-                              </Group>
-                            </Paper>
-                          );
-                        })}
-                      </Stack>
-                    </ScrollArea>
-                    <Button
-                      variant="subtle"
-                      color="red"
-                      size="xs"
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Clear all ${uploadedFiles.length} programs? This cannot be undone.`,
-                          )
-                        ) {
-                          setUploadedFiles([]);
-                          localStorage.removeItem(GLOBAL_PROGRAMS_STORAGE_KEY);
-                          setTimeout(() => saveWorkflow(false), 100);
-                        }
-                      }}
-                    >
-                      Clear All Programs
-                    </Button>
-                  </Stack>
-                )}
-
-                {/* Action Buttons */}
-                <Button
-                  variant="light"
-                  color="blue"
-                  fullWidth
-                  onClick={() => handleAddTransferNode()}
-                >
-                  SOL Transfer
-                </Button>
-
-                <Button
-                  variant="light"
-                  color="blue"
-                  fullWidth
-                  onClick={() => handleAddJupiterNode()}
-                >
-                  Jupiter Swap
-                </Button>
-
-                <Button
-                  variant="light"
-                  color="blue"
-                  fullWidth
-                  onClick={handleAddMeteoraNode}
-                >
-                  Meteora DLMM
-                </Button>
-
-                {/* <Group gap="xs">
+              <FileButton
+                onChange={handleFileUpload}
+                accept=".json"
+                multiple={false}
+              >
+                {(props) => (
                   <Button
-                    variant="filled"
-                    color="blue"
-                    fullWidth
-                    onClick={() => saveWorkflow(true)}
-                  >
-                    Save Workflow
-                  </Button>
-                  <Button
+                    {...props}
                     variant="light"
-                    color="red"
+                    leftSection={<IconUpload size={16} />}
                     fullWidth
-                    onClick={clearSavedWorkflow}
                   >
-                    Clear Saved
+                    Anchor IDL
                   </Button>
-                </Group> */}
+                )}
+              </FileButton>
 
-                <Button
-                  variant="filled"
-                  color="blue"
-                  fullWidth
-                  onClick={() => handleExecuteWorkflow()}
-                >
-                  Execute Workflow
-                </Button>
+              {/* Uploaded files section */}
+              {uploadedFiles.length > 0 && (
+                <Stack gap="xs">
+                  <Text fw={600} size="lg">
+                    Available Programs ({uploadedFiles.length})
+                  </Text>
+                  <ScrollArea h={240}>
+                    <Stack gap="xs">
+                      {uploadedFiles.map((file, index) => {
+                        const fileName = file.name || `File ${index + 1}`;
+                        const displayName = fileName.includes(".")
+                          ? fileName.split(".")[0]
+                          : fileName;
 
-                <ToastContainer
-                  position="bottom-right"
-                  autoClose={3000}
-                  hideProgressBar={false}
-                  newestOnTop
-                  closeOnClick
-                  rtl={false}
-                  pauseOnFocusLoss
-                  draggable
-                  pauseOnHover
-                  theme="light"
-                />
-              </Stack>
-            </Paper>
-          </motion.div>
-        )}
+                        return (
+                          <Paper
+                            key={`${fileName}-${index}`}
+                            p="xs"
+                            withBorder
+                            className="cursor-pointer hover:bg-gray-50"
+                            onClick={() => handleCreateActionNode(file)}
+                          >
+                            <Group justify="space-between">
+                              <div>
+                                <Text fw={500}>{displayName}</Text>
+                                <Text size="xs" c="dimmed">
+                                  {file.instructions.length} instructions •
+                                  Added{" "}
+                                  {new Date(file.timestamp).toLocaleString()}
+                                </Text>
+                              </div>
+                              <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (
+                                    confirm(`Remove program "${displayName}"?`)
+                                  ) {
+                                    setUploadedFiles((prev) => {
+                                      const updated = prev.filter(
+                                        (_, i) => i !== index,
+                                      );
+                                      return updated;
+                                    });
+                                  }
+                                }}
+                              >
+                                <IconTrash size={16} />
+                              </ActionIcon>
+                            </Group>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  </ScrollArea>
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    size="xs"
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `Clear all ${uploadedFiles.length} programs? This cannot be undone.`,
+                        )
+                      ) {
+                        setUploadedFiles([]);
+                      }
+                    }}
+                  >
+                    Clear All Programs
+                  </Button>
+                </Stack>
+              )}
+
+              {/* Action Buttons */}
+              <Button
+                variant="light"
+                color="blue"
+                fullWidth
+                onClick={() => handleAddTransferNode()}
+              >
+                SOL Transfer
+              </Button>
+
+              <Button
+                variant="light"
+                color="blue"
+                fullWidth
+                onClick={() => handleAddJupiterNode()}
+              >
+                Jupiter Swap
+              </Button>
+
+              <Button
+                variant="light"
+                color="blue"
+                fullWidth
+                onClick={handleAddMeteoraNode}
+              >
+                Meteora DLMM
+              </Button>
+
+              <Button
+                variant="filled"
+                color="blue"
+                fullWidth
+                onClick={() => handleExecuteWorkflow()}
+              >
+                Execute Workflow
+              </Button>
+
+              <Button
+                variant="filled"
+                color="blue"
+                fullWidth
+                onClick={handleSaveWorkflow}
+              >
+                Save Workflow
+              </Button>
+
+              <ToastContainer
+                position="bottom-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
+              />
+            </Stack>
+          </Paper>
+        </motion.div>
       </AnimatePresence>
     </div>
   );

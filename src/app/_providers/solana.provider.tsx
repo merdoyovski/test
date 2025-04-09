@@ -16,23 +16,21 @@ type SolanaWalletProviderProps = {
   children: ReactNode;
 };
 
+const RPC_KEY = process.env.NEXT_PUBLIC_RPC_KEY || "";
+
 const SolanaWalletProvider: NextPage<SolanaWalletProviderProps> = ({
   children,
 }) => {
   const network = WalletAdapterNetwork.Mainnet;
   const endpoint = useMemo(() => clusterApiUrl(network), [network]);
   const wallets = useMemo(
-    () => [new UnsafeBurnerWalletAdapter()],
+    () => [],
     [], // Empty dependency array since nothing inside is changing
   );
 
   return (
-    <ConnectionProvider
-      endpoint={
-        "https://boldest-sleek-fog.solana-mainnet.quiknode.pro/32241d86eca0b027514e5334dd5dff7009d091d4/"
-      }
-    >
-      <WalletProvider wallets={wallets}>
+    <ConnectionProvider endpoint={RPC_KEY}>
+      <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>

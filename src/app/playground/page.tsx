@@ -2,13 +2,14 @@
 
 import { useNodesState, useEdgesState, addEdge } from "reactflow";
 import FlowArea from "./Flowarea";
-import { SideBar } from "./Sidebar";
 import { useState, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { WorkflowTabs, Workflow } from "./WorkflowTabs";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
-import { Node } from "reactflow";
+import { useQuery } from "@tanstack/react-query";
+import { fetchWorkflows } from "../api/workflowApi";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 // Constants
 const WORKFLOWS_KEY = "bflow_workflows";
@@ -17,12 +18,30 @@ const DEFAULT_WORKFLOW_NAME = "Untitled Workflow";
 export default function PlaygroundPage() {
   const pathname = usePathname();
   const isPlayground = pathname === "/playground";
+  const { publicKey } = useWallet();
 
-  const [userAddress, setUserAddress] = useState("mert");
-  /*  const { data, isLoading, error } = useQuery({
-    queryKey: ["workflowAll", userAddress],
-    queryFn: fetchWorkflowData,
-  }); */
+  const {
+    data: workflowsData,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["workflows", publicKey?.toBase58()],
+    queryFn: () => {
+      if (!publicKey) {
+        throw new Error("Wallet not connected");
+      }
+      return fetchWorkflows(publicKey.toBase58());
+    },
+    enabled: !!publicKey,
+    retry: 1,
+  });
+
+  // Clear auth token when wallet disconnects
+  useEffect(() => {
+    if (!publicKey) {
+      localStorage.removeItem("auth_token");
+    }
+  }, [publicKey]);
 
   // Workflow state
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -40,41 +59,66 @@ export default function PlaygroundPage() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  // Initialize with one workflow if none exists
+  // Initialize workflows from API data
   useEffect(() => {
-    // Check if we have any saved workflows
-    const savedWorkflows = localStorage.getItem(WORKFLOWS_KEY);
+    if (workflowsData && workflowsData.length > 0) {
+      const transformedWorkflows = workflowsData
+        .map((workflow) => {
+          if (!workflow.id || !workflow.name) {
+            console.error("Invalid workflow data:", workflow);
+            return null;
+          }
+          return {
+            id: workflow.id,
+            name: workflow.name,
+            isActive: false,
+          };
+        })
+        .filter(
+          (workflow): workflow is NonNullable<typeof workflow> =>
+            workflow !== null,
+        );
 
-    if (savedWorkflows) {
-      // Load saved workflows
-      const parsedWorkflows = JSON.parse(savedWorkflows) as Workflow[];
-      setWorkflows(parsedWorkflows);
+      if (transformedWorkflows.length === 0) {
+        console.error("No valid workflows found in the response");
+        return;
+      }
 
       // Set the first workflow as active
-      if (parsedWorkflows.length > 0) {
-        // Find active workflow or use the first one
-        const activeWorkflow =
-          parsedWorkflows.find((w) => w.isActive) || parsedWorkflows[0];
+      transformedWorkflows[0]!.isActive = true;
+      setWorkflows(transformedWorkflows);
+      setActiveWorkflowId(transformedWorkflows[0]!.id);
 
-        if (activeWorkflow) {
-          setActiveWorkflowId(activeWorkflow.id);
-
-          // Mark the active workflow if not already marked
-          if (!activeWorkflow.isActive) {
-            const updatedWorkflows = parsedWorkflows.map((w) => ({
-              ...w,
-              isActive: w.id === activeWorkflow.id,
-            }));
-            setWorkflows(updatedWorkflows);
-            localStorage.setItem(
-              WORKFLOWS_KEY,
-              JSON.stringify(updatedWorkflows),
-            );
+      // Initialize workflow states from API data
+      const initialWorkflowStates = workflowsData.reduce(
+        (acc, workflow) => {
+          if (!workflow.id || !workflow.actions) {
+            console.error("Invalid workflow data:", workflow);
+            return acc;
           }
-        }
+          acc[workflow.id] = {
+            nodes: workflow.actions,
+            edges: [], // Initialize with empty edges since they're not in the API response
+          };
+          return acc;
+        },
+        {} as { [key: string]: { nodes: any[]; edges: any[] } },
+      );
+
+      setWorkflowStates(initialWorkflowStates);
+
+      // Set initial nodes and edges for the active workflow
+      const activeWorkflow = workflowsData[0];
+      const workflowId = activeWorkflow?.id;
+      const workflowActions = activeWorkflow?.actions;
+
+      if (workflowId && workflowActions && initialWorkflowStates[workflowId]) {
+        const workflowState = initialWorkflowStates[workflowId];
+        setNodes(workflowState.nodes);
+        setEdges(workflowState.edges);
       }
-    } else {
-      // Create a new workflow if none exists
+    } else if (!isLoading && !publicKey) {
+      // Create a new workflow if none exists and user is not connected
       const newWorkflowId = uuidv4();
       const initialWorkflow = {
         id: newWorkflowId,
@@ -84,9 +128,14 @@ export default function PlaygroundPage() {
 
       setWorkflows([initialWorkflow]);
       setActiveWorkflowId(newWorkflowId);
-      localStorage.setItem(WORKFLOWS_KEY, JSON.stringify([initialWorkflow]));
+      setWorkflowStates({
+        [newWorkflowId]: {
+          nodes: [],
+          edges: [],
+        },
+      });
     }
-  }, []);
+  }, [workflowsData, isLoading, publicKey]);
 
   // Load workflow state when active workflow changes
   useEffect(() => {
@@ -199,9 +248,10 @@ export default function PlaygroundPage() {
         },
       }));
 
+      console.log("nodes: ", nodes);
       // Save to localStorage
       const storageKey = `bflow_workflow_${activeWorkflowId}`;
-      localStorage.setItem(storageKey, JSON.stringify({ nodes, edges }));
+      //localStorage.setItem(storageKey, JSON.stringify({ nodes, edges }));
     }, 300); // Debounce for 300ms
 
     // Cleanup the timeout on unmount or when deps change
@@ -210,7 +260,8 @@ export default function PlaygroundPage() {
 
   // Handle adding a new workflow
   const handleAddWorkflow = () => {
-    const newWorkflowId = uuidv4();
+    //const newWorkflowId = uuidv4();
+    const newWorkflowId = "tbdOnServer";
 
     // Create initial empty state for the new workflow
     const initialWorkflowState = {
@@ -264,15 +315,6 @@ export default function PlaygroundPage() {
         isActive: false, // Deactivate all existing workflows
       }))
       .concat(newWorkflow);
-
-    // Save workflows to localStorage
-    localStorage.setItem(WORKFLOWS_KEY, JSON.stringify(updatedWorkflows));
-
-    // Create empty workflow file in localStorage
-    localStorage.setItem(
-      `bflow_workflow_${newWorkflowId}`,
-      JSON.stringify(initialWorkflowState),
-    );
 
     // Batch update states to minimize renders
     // First update state variables
@@ -420,6 +462,9 @@ export default function PlaygroundPage() {
             nodes={nodes}
             setNodes={setNodes}
             workflowId={activeWorkflowId}
+            workflowName={
+              workflows.find((w) => w.id === activeWorkflowId)?.name || ""
+            }
           />
         </div>
       )}

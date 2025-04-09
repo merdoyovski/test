@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { WorkflowTabs, Workflow } from "./WorkflowTabs";
 import FlowArea from "./Flowarea";
@@ -11,6 +11,7 @@ import {
   applyEdgeChanges,
   addEdge,
 } from "reactflow";
+import { fetchWorkflows } from "../api/workflowApi";
 
 // Constants
 const WORKFLOWS_KEY = "bflow_workflows";
@@ -23,16 +24,45 @@ interface WorkflowWithFlow extends Workflow {
 
 export default function Flow() {
   const [userAddress, setUserAddress] = useState("mert");
-  const [workflows, setWorkflows] = useState<WorkflowWithFlow[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(WORKFLOWS_KEY);
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
+  const [workflows, setWorkflows] = useState<WorkflowWithFlow[]>([]);
   const [activeWorkflowId, setActiveWorkflowId] = useState<string>("");
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+
+  // Add useEffect to fetch workflows
+  useEffect(() => {
+    const loadWorkflows = async () => {
+      try {
+        const userAddress = "mert"; // Replace with actual user address
+        const fetchedWorkflows = await fetchWorkflows(userAddress);
+
+        // Transform WorkflowResponse to WorkflowWithFlow
+        const transformedWorkflows = fetchedWorkflows.map((workflow) => ({
+          id: workflow.id,
+          name: workflow.name,
+          nodes: workflow.actions.map((action) => ({
+            id: action.id,
+            type: action.type,
+            position: action.position,
+            data: action.data,
+            width: action.width,
+            height: action.height,
+            selected: action.selected,
+            positionAbsolute: action.positionAbsolute,
+            dragging: action.dragging,
+          })),
+          edges: [], // You'll need to handle edges separately if they're part of your workflow
+          isActive: false, // Set initial active state
+        }));
+
+        setWorkflows(transformedWorkflows);
+      } catch (error) {
+        console.error("Error loading workflows:", error);
+      }
+    };
+
+    loadWorkflows();
+  }, [userAddress]);
 
   const handleSelectWorkflow = (id: string) => {
     setActiveWorkflowId(id);
